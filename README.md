@@ -2,9 +2,18 @@
 
 **A sovereign writing instrument for structured cognition.**
 
+hbar.ink is part of the larger hbar.systems ecosystem.
+
 hbar.ink is not a "notes app" and not a feature race.  
 It is a minimalist, private-by-design writing surface — an instrument layer  
 architecturally ready for future intelligence integration, but fully usable today.
+
+## Philosophy
+
+hbar.ink is built on the belief that tools shape thought.  
+Minimal structure enables clarity.  
+Stability enables trust.  
+Restraint enables focus.
 
 ## Status
 
@@ -78,8 +87,7 @@ When a document is **sealed** (status = terminal):
 
 ### Why Sealing Matters
 
-Sealed documents become **artifacts** — stable references you can cite, link to, and trust won't change.  
-This is foundational for Phase 4 (cognitive system) where sealed documents gain permanence.
+Sealed documents become **artifacts** — stable references you can cite, link to, and trust won't change.
 
 ### AI Policy Enforcement
 
@@ -219,21 +227,14 @@ Documents gain invisible structure:
 - Still feels minimal
 
 ### Phase 3 – Thinking Amplifier
-AI integration that:
-- Reorganizes arguments
-- Suggests structure
-- Detects repetition
-- Connects related documents
-- Creates cognitive graph silently
-- Still not noisy
+- AI-assisted structure and argument refinement
+- Cross-document connections
+- Still minimal, still quiet
 
 ### Phase 4 – Sovereign Cognitive System
-**Sealing matters here.**
-- Documents become artifacts
+- Sealed documents become trusted artifacts
 - Brain integration reads only when allowed
-- This becomes a thinking laboratory
-- Policy-gated intelligence
-- Permanent, citable references
+- Intelligence layer, user-controlled
 
 ## Keyboard Shortcuts
 
@@ -259,7 +260,7 @@ Configuration files for both platforms are included.
 
 ## Data Model
 
-The application uses a single `documents` table with Row Level Security:
+Single `documents` table with Row Level Security:
 
 | Field | Type | Description |
 |-------|------|-------------|

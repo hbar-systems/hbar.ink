@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { formatDistanceToNow } from 'date-fns'
+import JSZip from 'jszip'
 import Link from 'next/link'
 import type { Document, DocumentStatus, DocumentSystem, DocumentAIPolicy } from '@/types/document'
 import { Toast, ToastProvider, useToast } from '@/components/ui/toast'
@@ -33,6 +34,11 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
   const [pinnedDocIds, setPinnedDocIds] = useState<Set<string>>(new Set())
   const [savedViews, setSavedViews] = useState<Array<{name: string, filters: any}>>([{name: 'All', filters: {}}, {name: 'Notes', filters: {kind: 'note'}}, {name: 'Prompts', filters: {kind: 'prompt'}}])
   const [activeView, setActiveView] = useState('All')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleteConfirmTitle, setDeleteConfirmTitle] = useState('')
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false)
+  const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState('')
+  const [isExporting, setIsExporting] = useState(false)
   
   // Track mouse position for edge hover
   useEffect(() => {
@@ -164,6 +170,117 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
     return matchesSearch && matchesSystem && matchesStatus && matchesAiPolicy
   })
   
+  // Handle deleting a document
+  const handleDeleteDocument = async (docId: string) => {
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', docId)
+
+      if (error) {
+        console.error('Error deleting document:', error)
+        showToast(`Failed to delete: ${error.message}`, 'error')
+        return
+      }
+
+      showToast('Document deleted', 'success')
+      setDeleteConfirmId(null)
+      setDeleteConfirmTitle('')
+
+      // Remove from local state
+      setDocuments(prev => prev.filter(d => d.id !== docId))
+
+      // If we're viewing the deleted doc, go to /app
+      if (pathname === `/doc/${docId}`) {
+        router.push('/app')
+      }
+    } catch (error) {
+      console.error('Error deleting document:', error)
+      showToast('Failed to delete document', 'error')
+    }
+  }
+
+  // Handle exporting all documents as ZIP
+  const handleExportAll = async () => {
+    if (isExporting) return
+    setIsExporting(true)
+    
+    try {
+      const { data: allDocs, error } = await supabase
+        .from('documents')
+        .select('*')
+        .order('updated_at', { ascending: false })
+
+      if (error || !allDocs || allDocs.length === 0) {
+        showToast(error ? `Export failed: ${error.message}` : 'No documents to export', 'error')
+        setIsExporting(false)
+        return
+      }
+
+      const zip = new JSZip()
+      const date = new Date().toISOString().split('T')[0]
+
+      allDocs.forEach((doc: Document) => {
+        const sanitizedTitle = (doc.title || 'untitled').replace(/[^a-z0-9]/gi, '-').toLowerCase()
+        const filename = `${sanitizedTitle}__${doc.system}__${doc.status}.md`
+        const header = `# ${doc.title || 'Untitled'}\n\n---\nsystem: ${doc.system}\nkind: ${doc.source_kind}\nstatus: ${doc.status}\nai_policy: ${doc.ai_policy}\ncreated: ${doc.created_at}\nupdated: ${doc.updated_at}\n---\n\n`
+        zip.file(filename, header + doc.content_md)
+      })
+
+      const blob = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `hbar-ink-export__${date}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      showToast(`Exported ${allDocs.length} documents`, 'success')
+    } catch (error) {
+      console.error('Export error:', error)
+      showToast('Failed to export documents', 'error')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // Handle deleting account
+  const handleDeleteAccount = async () => {
+    try {
+      // Delete all documents first
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        showToast('Not authenticated', 'error')
+        return
+      }
+
+      const { error: docsError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('owner_id', user.id)
+
+      if (docsError) {
+        console.error('Error deleting documents:', docsError)
+        showToast(`Failed to delete documents: ${docsError.message}`, 'error')
+        return
+      }
+
+      // Sign out (Supabase doesn't allow self-delete via client SDK,
+      // but we've wiped all user data)
+      await supabase.auth.signOut()
+      
+      showToast('All data deleted. Account signed out.', 'success')
+      setShowDeleteAccount(false)
+      router.push('/login')
+    } catch (error) {
+      console.error('Error deleting account:', error)
+      showToast('Failed to delete account', 'error')
+    }
+  }
+
   // Handle creating a new document
   const handleCreateDocument = async () => {
     try {
@@ -298,16 +415,29 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
                                 <span>{doc.status === 'terminal' ? 'sealed' : doc.status}</span>
                               </div>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault()
-                                togglePin(doc.id)
-                              }}
-                              className="text-gray-600 hover:text-gray-800 transition-colors"
-                              title="Unpin document"
-                            >
-                              📌
-                            </button>
+                            <div className="flex flex-col gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  togglePin(doc.id)
+                                }}
+                                className="text-gray-600 hover:text-gray-800 transition-colors"
+                                title="Unpin document"
+                              >
+                                📌
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  setDeleteConfirmId(doc.id)
+                                  setDeleteConfirmTitle(doc.title || 'Untitled')
+                                }}
+                                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete document"
+                              >
+                                🗑
+                              </button>
+                            </div>
                           </div>
                         </Link>
                       </li>
@@ -345,16 +475,29 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
                               </span>
                             </div>
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault()
-                              togglePin(doc.id)
-                            }}
-                            className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 transition-opacity"
-                            title="Pin document"
-                          >
-                            📌
-                          </button>
+                          <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault()
+                                togglePin(doc.id)
+                              }}
+                              className="text-gray-400 hover:text-gray-600"
+                              title="Pin document"
+                            >
+                              📌
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault()
+                                setDeleteConfirmId(doc.id)
+                                setDeleteConfirmTitle(doc.title || 'Untitled')
+                              }}
+                              className="text-gray-300 hover:text-red-500"
+                              title="Delete document"
+                            >
+                              �
+                            </button>
+                          </div>
                         </div>
                       </Link>
                     </li>
@@ -364,12 +507,102 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
             </>
           )}
         </div>
+
+        {/* Account actions at bottom */}
+        <div className="p-4 border-t border-gray-200 space-y-2">
+          <button
+            onClick={handleExportAll}
+            disabled={isExporting}
+            className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-700 hover:bg-white/50 transition-colors rounded"
+          >
+            {isExporting ? 'Exporting...' : 'Download all as ZIP'}
+          </button>
+          <button
+            onClick={() => setShowDeleteAccount(true)}
+            className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-red-500 transition-colors rounded"
+          >
+            Delete account & data
+          </button>
+        </div>
       </div>
       
       {/* Main content */}
       <div className="flex-1 overflow-y-auto">
         {children}
       </div>
+
+      {/* Delete account confirmation modal */}
+      {showDeleteAccount && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Delete account?</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              This will permanently delete <strong>all your documents</strong> and sign you out. This cannot be undone.
+            </p>
+            <p className="text-sm text-gray-500 mb-2">
+              We recommend downloading your documents first.
+            </p>
+            <button
+              onClick={handleExportAll}
+              disabled={isExporting}
+              className="mb-4 text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              {isExporting ? 'Exporting...' : 'Download all as ZIP first'}
+            </button>
+            <p className="text-sm text-gray-600 mb-2">
+              Type <strong>DELETE</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteAccountConfirmText}
+              onChange={(e) => setDeleteAccountConfirmText(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4 focus:outline-none focus:ring-1 focus:ring-red-500"
+              placeholder="Type DELETE"
+            />
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => { setShowDeleteAccount(false); setDeleteAccountConfirmText('') }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteAccountConfirmText !== 'DELETE'}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Delete everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Delete document?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              <strong>{deleteConfirmTitle}</strong> will be permanently deleted. This cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => { setDeleteConfirmId(null); setDeleteConfirmTitle('') }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteConfirmId && handleDeleteDocument(deleteConfirmId)}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

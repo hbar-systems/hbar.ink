@@ -11,6 +11,7 @@ CREATE TABLE public.documents (
   ai_policy text NOT NULL DEFAULT 'deny',
   style_preset text NOT NULL DEFAULT 'WritersRoom',
   pin_rank int NULL,
+  sealed_at timestamptz NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
