@@ -95,6 +95,23 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
 
   const { focusMode, toggleFocusMode, setStylePreset: setGlobalPreset } = useFocusMode()
 
+  // Always-current refs for use in cleanup / unmount handlers
+  const contentRef = useRef(content)
+  const titleRef = useRef(title)
+  contentRef.current = content
+  titleRef.current = title
+
+  // Emergency save on unmount — fires even when navigating away mid-edit
+  // Uses fire-and-forget (no await) so Next.js navigation doesn't kill it
+  useEffect(() => {
+    return () => {
+      supabase.from('documents').update({
+        content_md: contentRef.current,
+        title: titleRef.current,
+      }).eq('id', docRow.id).then(() => {})
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keep sidebar theme in sync with this document's preset
   useEffect(() => { setGlobalPreset(stylePreset) }, [stylePreset])
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -153,6 +170,21 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
     }
   }, [editor])
 
+  // Restore local draft if newer than server version (catches unsaved edits from crashes/navigation)
+  useEffect(() => {
+    const localDraft = localStorage.getItem(`draft-${docRow.id}`)
+    if (!localDraft) return
+    try {
+      const { content: localContent, timestamp } = JSON.parse(localDraft)
+      if (new Date(timestamp) > new Date(docRow.updated_at) && localContent !== docRow.content_md) {
+        setContent(localContent)
+        if (editor) editor.commands.setContent(localContent)
+      }
+    } catch {
+      localStorage.removeItem(`draft-${docRow.id}`)
+    }
+  }, [editor]) // runs once when editor is ready
+
   // Load editor width and font preferences from localStorage
   useEffect(() => {
     const savedWidth = localStorage.getItem('editor-width') as 'wide' | 'comfort' | 'narrow' | null
@@ -195,11 +227,10 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
 
     saveTimeoutRef.current = setTimeout(async () => {
       await saveDocument()
-    }, 800)
+    }, 300) // 300ms — fast enough to survive quick navigation
 
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-    }
+    // No cleanup clearTimeout here — if user navigates away mid-debounce,
+    // the emergency unmount save above covers it. Cancelling was the bug.
   }, [content])
 
   useEffect(() => {
