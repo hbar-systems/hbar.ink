@@ -10,6 +10,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Highlight from '@tiptap/extension-highlight'
 import { Color } from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
+import Underline from '@tiptap/extension-underline'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
@@ -28,7 +29,7 @@ const TabHandler = Extension.create({
         if (editor.isActive('listItem') || editor.isActive('taskItem')) {
           return editor.commands.sinkListItem('listItem')
         }
-        return editor.commands.insertContent('  ')
+        return editor.commands.insertContent('\u00A0\u00A0\u00A0\u00A0') // non-breaking spaces (visible indent)
       },
       'Shift-Tab': ({ editor }) => {
         if (editor.isActive('listItem') || editor.isActive('taskItem')) {
@@ -39,6 +40,31 @@ const TabHandler = Extension.create({
     }
   },
 })
+
+function BubbleBtn({ active, onClick, night, title, children }: { active: boolean; onClick: () => void; night: boolean; title: string; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`px-2 py-0.5 text-xs rounded transition-colors ${
+        active
+          ? night ? 'bg-gray-600 text-white' : 'bg-gray-900 text-white'
+          : night ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ShortcutRow({ k, label }: { k: string; label: string }) {
+  return (
+    <>
+      <span className="font-mono text-xs bg-gray-100 rounded px-1.5 py-0.5 text-gray-600 justify-self-start">{k}</span>
+      <span className="text-gray-600">{label}</span>
+    </>
+  )
+}
 
 function DocumentEditorContent({ document: docRow }: { document: DocType }) {
   const { showToast } = useToast()
@@ -64,6 +90,8 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
   const [headerVisible, setHeaderVisible] = useState(true)
   const [fontOverride, setFontOverride] = useState<'quicksand' | 'montserrat' | 'audiowide' | 'spectral' | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(null)
 
   const { focusMode, toggleFocusMode, setStylePreset: setGlobalPreset } = useFocusMode()
 
@@ -79,6 +107,7 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
       Highlight.configure({ multicolor: true }),
       TextStyle,
       Color,
+      Underline,
       TaskList,
       TaskItem.configure({ nested: true }),
       Markdown.configure({
@@ -103,6 +132,26 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
       editor.setEditable(status !== 'terminal')
     }
   }, [editor, status])
+
+  // Track selection to show/hide bubble toolbar
+  useEffect(() => {
+    if (!editor) return
+    const updateBubble = () => {
+      const { from, to } = editor.state.selection
+      if (from === to) { setBubblePos(null); return }
+      const domSel = window.getSelection()
+      if (!domSel || domSel.rangeCount === 0) { setBubblePos(null); return }
+      const rect = domSel.getRangeAt(0).getBoundingClientRect()
+      if (rect.width === 0) { setBubblePos(null); return }
+      setBubblePos({ x: rect.left + rect.width / 2, y: rect.top })
+    }
+    editor.on('selectionUpdate', updateBubble)
+    editor.on('blur', () => setBubblePos(null))
+    return () => {
+      editor.off('selectionUpdate', updateBubble)
+      editor.off('blur', () => setBubblePos(null))
+    }
+  }, [editor])
 
   // Load editor width and font preferences from localStorage
   useEffect(() => {
@@ -185,6 +234,14 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
       if (e.key === 'Escape' && showCmdK) {
         e.preventDefault()
         setShowCmdK(false)
+      }
+      if (e.key === 'Escape' && showShortcuts) {
+        e.preventDefault()
+        setShowShortcuts(false)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault()
+        setShowShortcuts(prev => !prev)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -421,6 +478,9 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
                 <button onClick={toggleFocusMode} className={`px-3 py-1.5 text-xs transition-colors ${focusMode ? 'text-gray-900 font-medium' : 'text-gray-600 hover:text-gray-900'}`}>
                   Focus
                 </button>
+                <button onClick={() => setShowShortcuts(true)} className="px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors" title="Keyboard shortcuts (⌘/)">
+                  ?
+                </button>
                 <div className="relative">
                   <button onClick={() => setShowExportMenu(prev => !prev)} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors">
                     Export ▾
@@ -579,6 +639,100 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
               <button onClick={handleConfirmSeal} className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md shadow-sm hover:bg-purple-700">
                 Confirm Seal
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bubble formatting toolbar — positions above current text selection */}
+      {editor && bubblePos && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${bubblePos.x}px`,
+            top: `${bubblePos.y - 8}px`,
+            transform: 'translateX(-50%) translateY(-100%)',
+            zIndex: 200,
+          }}
+          onMouseDown={(e) => e.preventDefault()} // keep editor focused
+        >
+          <div className={`flex items-center gap-0.5 rounded-lg px-1.5 py-1 shadow-xl border ${
+            stylePreset === 'NightInk' ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <BubbleBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} night={stylePreset === 'NightInk'} title="Bold (⌘B)"><strong>B</strong></BubbleBtn>
+            <BubbleBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} night={stylePreset === 'NightInk'} title="Italic (⌘I)"><em>I</em></BubbleBtn>
+            <BubbleBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} night={stylePreset === 'NightInk'} title="Underline (⌘U)"><span className="underline">U</span></BubbleBtn>
+            <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
+            <BubbleBtn active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} night={stylePreset === 'NightInk'} title="Heading 1">H1</BubbleBtn>
+            <BubbleBtn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} night={stylePreset === 'NightInk'} title="Heading 2">H2</BubbleBtn>
+            <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
+            <BubbleBtn active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight({ color: '#ffd54f' }).run()} night={stylePreset === 'NightInk'} title="Highlight">
+              <span style={{ background: '#ffd54f', borderRadius: 2, padding: '0 3px', color: '#1a1a1a' }}>ab</span>
+            </BubbleBtn>
+            <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
+            {[
+              { color: 'reset', label: 'Default', bg: stylePreset === 'NightInk' ? '#555' : '#ddd' },
+              { color: '#d97706', label: 'Amber', bg: '#d97706' },
+              { color: '#7c3aed', label: 'Violet', bg: '#7c3aed' },
+              { color: '#0284c7', label: 'Sky', bg: '#0284c7' },
+              { color: '#e11d48', label: 'Rose', bg: '#e11d48' },
+            ].map(({ color, label, bg }) => (
+              <button
+                key={color}
+                onClick={() => color === 'reset' ? editor.chain().focus().unsetColor().run() : editor.chain().focus().setColor(color).run()}
+                title={label}
+                className="w-3.5 h-3.5 rounded-full flex-shrink-0 hover:scale-110 transition-transform"
+                style={{ backgroundColor: bg }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Shortcuts modal */}
+      {showShortcuts && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowShortcuts(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-base font-semibold text-gray-900">Keyboard Shortcuts</h3>
+              <button onClick={() => setShowShortcuts(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+              <div className="col-span-2 text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Formatting</div>
+              {[
+                ['⌘B', 'Bold'],
+                ['⌘I', 'Italic'],
+                ['⌘U', 'Underline'],
+                ['⌘⇧H', 'Highlight'],
+                ['Tab', 'Indent'],
+                ['⇧Tab', 'Unindent'],
+              ].map(([key, label]) => <ShortcutRow key={key} k={key} label={label} />)}
+
+              <div className="col-span-2 text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 mb-1">Navigation</div>
+              {[
+                ['⌘K', 'Document switcher'],
+                ['⌘N', 'New document'],
+                ['⌘S', 'Save'],
+                ['⌘\\', 'Focus mode'],
+                ['⌘/', 'This panel'],
+              ].map(([key, label]) => <ShortcutRow key={key} k={key} label={label} />)}
+
+              <div className="col-span-2 text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 mb-1">Type then Space</div>
+              {[
+                ['#', 'Heading 1'],
+                ['##', 'Heading 2'],
+                ['###', 'Heading 3'],
+                ['—', '—'],
+                ['-', 'Bullet list'],
+                ['1.', 'Numbered list'],
+                ['[ ]', 'Task / checkbox'],
+                ['>', 'Blockquote'],
+                ['```', 'Code block'],
+                ['---', 'Divider'],
+              ].map(([key, label]) => label === '—'
+                ? <div key={key} className="col-span-2" />
+                : <ShortcutRow key={key} k={key} label={label} />
+              )}
             </div>
           </div>
         </div>

@@ -1,6 +1,9 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from 'react'
+
+// useLayoutEffect runs before paint on client; falls back to useEffect on server (SSR)
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 interface AppContextType {
   focusMode: boolean
@@ -21,7 +24,7 @@ export function FocusModeProvider({ children }: { children: ReactNode }) {
   const [focusMode, setFocusMode] = useState(false)
   const [stylePreset, setStylePresetState] = useState('WritersRoom')
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     setFocusMode(localStorage.getItem('focus-mode') === 'true')
     setStylePresetState(localStorage.getItem('style-preset') || 'WritersRoom')
   }, [])
