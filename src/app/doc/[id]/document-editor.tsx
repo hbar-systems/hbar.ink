@@ -65,7 +65,10 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
   const [fontOverride, setFontOverride] = useState<'quicksand' | 'montserrat' | 'audiowide' | 'spectral' | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
 
-  const { focusMode, toggleFocusMode } = useFocusMode()
+  const { focusMode, toggleFocusMode, setStylePreset: setGlobalPreset } = useFocusMode()
+
+  // Keep sidebar theme in sync with this document's preset
+  useEffect(() => { setGlobalPreset(stylePreset) }, [stylePreset])
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // TipTap editor

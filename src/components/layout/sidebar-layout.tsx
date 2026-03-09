@@ -14,14 +14,29 @@ interface SidebarLayoutProps {
   children: React.ReactNode
 }
 
+const TrashIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 4h12M6 4V2h4v2M13 4l-1 10H4L3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+
 function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
   const supabase = createClientComponentClient()
   const router = useRouter()
   const pathname = usePathname()
   const { showToast } = useToast()
-  const { focusMode } = useFocusMode()
-  
-  // ALL hooks must be declared before any conditional returns
+  const { focusMode, stylePreset } = useFocusMode()
+
+  const isNight = stylePreset === 'NightInk'
+  const bg = isNight ? '#1a1a1a' : '#f6f5f2'
+  const sidebarBg = isNight ? '#1e1e1e' : '#fafaf9'
+  const border = isNight ? 'border-gray-700' : 'border-gray-200'
+  const textPrimary = isNight ? 'text-gray-100' : 'text-gray-900'
+  const textMuted = isNight ? 'text-gray-500' : 'text-gray-400'
+  const textSecondary = isNight ? 'text-gray-400' : 'text-gray-500'
+  const hoverBg = isNight ? 'hover:bg-white/5' : 'hover:bg-white/50'
+  const activeBg = isNight ? 'bg-white/10 border-l-2 border-gray-500' : 'bg-white border-l-2 border-gray-400'
+
   const [sidebarVisible, setSidebarVisible] = useState(false)
   const [mouseNearEdge, setMouseNearEdge] = useState(false)
   const [documents, setDocuments] = useState<Document[]>([])
@@ -32,202 +47,150 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
   const [aiPolicyFilter, setAiPolicyFilter] = useState<DocumentAIPolicy | 'all'>('all')
   const [availableSystems, setAvailableSystems] = useState<DocumentSystem[]>([])
   const [pinnedDocIds, setPinnedDocIds] = useState<Set<string>>(new Set())
-  const [savedViews, setSavedViews] = useState<Array<{name: string, filters: any}>>([{name: 'All', filters: {}}, {name: 'Notes', filters: {kind: 'note'}}, {name: 'Prompts', filters: {kind: 'prompt'}}])
+  const [savedViews, setSavedViews] = useState<Array<{name: string, filters: any}>>([
+    {name: 'All', filters: {}},
+    {name: 'Notes', filters: {kind: 'note'}},
+    {name: 'Prompts', filters: {kind: 'prompt'}}
+  ])
   const [activeView, setActiveView] = useState('All')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState('')
   const [showDeleteAccount, setShowDeleteAccount] = useState(false)
   const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState('')
   const [isExporting, setIsExporting] = useState(false)
-  
-  // Track mouse position for edge hover
+
+  // Edge hover in focus mode
   useEffect(() => {
     if (!focusMode) return
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      setMouseNearEdge(e.clientX <= 12)
-    }
-    
+    const handleMouseMove = (e: MouseEvent) => setMouseNearEdge(e.clientX <= 12)
     window.addEventListener('mousemove', handleMouseMove)
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [focusMode])
-  
-  // Keyboard shortcut Cmd+B to toggle sidebar in focus mode
+
+  // Cmd+B sidebar toggle in focus mode
   useEffect(() => {
     if (!focusMode) return
-    
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault()
         setSidebarVisible(prev => !prev)
       }
     }
-    
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [focusMode])
-  
-  // Show sidebar when mouse near edge or manually toggled
+
+  // Cmd+N: create new document from anywhere
   useEffect(() => {
-    if (focusMode && mouseNearEdge) {
-      setSidebarVisible(true)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault()
+        handleCreateDocument()
+      }
     }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    if (focusMode && mouseNearEdge) setSidebarVisible(true)
   }, [focusMode, mouseNearEdge])
-  
-  // Load pinned docs and saved views from localStorage
+
   useEffect(() => {
     const pinned = localStorage.getItem('pinned-docs')
-    if (pinned) {
-      setPinnedDocIds(new Set(JSON.parse(pinned)))
-    }
-    
+    if (pinned) setPinnedDocIds(new Set(JSON.parse(pinned)))
+
     const views = localStorage.getItem('saved-views')
     if (views) {
       const parsed = JSON.parse(views)
       setSavedViews([...savedViews, ...parsed])
     }
   }, [])
-  
-  // Toggle pin
+
   const togglePin = (docId: string) => {
     const newPinned = new Set(pinnedDocIds)
-    if (newPinned.has(docId)) {
-      newPinned.delete(docId)
-    } else {
-      newPinned.add(docId)
-    }
+    if (newPinned.has(docId)) newPinned.delete(docId)
+    else newPinned.add(docId)
     setPinnedDocIds(newPinned)
     localStorage.setItem('pinned-docs', JSON.stringify(Array.from(newPinned)))
   }
-  
-  // Apply view
+
   const applyView = (view: {name: string, filters: any}) => {
     setActiveView(view.name)
     setSystemFilter(view.filters.system || 'all')
     setStatusFilter(view.filters.status || 'all')
     setAiPolicyFilter(view.filters.aiPolicy || 'all')
   }
-  
-  // Fetch documents
+
   useEffect(() => {
-    if (focusMode && !sidebarVisible) return // Don't fetch if sidebar not visible in focus mode
-    
+    if (focusMode && !sidebarVisible) return
     const fetchDocuments = async () => {
       setLoading(true)
-      
       const { data: documents, error } = await supabase
         .from('documents')
         .select('*')
         .order('updated_at', { ascending: false })
-      
-      if (error) {
-        console.error('Error fetching documents:', error)
-        setLoading(false)
-        return
-      }
-      
+      if (error) { console.error('Error fetching documents:', error); setLoading(false); return }
       if (documents) {
         setDocuments(documents as Document[])
-        
-        // Extract unique systems for filter dropdown
         const systemsSet = new Set<DocumentSystem>()
         documents.forEach(doc => systemsSet.add(doc.system as DocumentSystem))
-        const systems = Array.from(systemsSet)
-        setAvailableSystems(systems)
+        setAvailableSystems(Array.from(systemsSet))
       }
-      
       setLoading(false)
     }
-    
     fetchDocuments()
   }, [supabase, focusMode, sidebarVisible, pathname])
-  
-  // In focus mode without sidebar visible, render only children
+
   if (focusMode && !sidebarVisible) {
-    return <div className="min-h-screen" style={{ backgroundColor: '#f6f5f2' }}>{children}</div>
+    return <div className="min-h-screen" style={{ backgroundColor: bg }}>{children}</div>
   }
-  
-  // Separate pinned and unpinned documents
+
   const pinnedDocs = documents.filter(doc => pinnedDocIds.has(doc.id))
   const unpinnedDocs = documents.filter(doc => !pinnedDocIds.has(doc.id))
-  
-  // Filter documents based on search query and filters
+
   const filteredDocuments = unpinnedDocs.filter(doc => {
-    // Search query filter
-    const matchesSearch = searchQuery === '' || 
+    const matchesSearch = searchQuery === '' ||
       doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.content_md.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    // System filter
     const matchesSystem = systemFilter === 'all' || doc.system === systemFilter
-    
-    // Status filter
     const matchesStatus = statusFilter === 'all' || doc.status === statusFilter
-    
-    // AI policy filter
     const matchesAiPolicy = aiPolicyFilter === 'all' || doc.ai_policy === aiPolicyFilter
-    
     return matchesSearch && matchesSystem && matchesStatus && matchesAiPolicy
   })
-  
-  // Handle deleting a document
+
   const handleDeleteDocument = async (docId: string) => {
     try {
-      const { error } = await supabase
-        .from('documents')
-        .delete()
-        .eq('id', docId)
-
-      if (error) {
-        console.error('Error deleting document:', error)
-        showToast(`Failed to delete: ${error.message}`, 'error')
-        return
-      }
-
+      const { error } = await supabase.from('documents').delete().eq('id', docId)
+      if (error) { showToast(`Failed to delete: ${error.message}`, 'error'); return }
       showToast('Document deleted', 'success')
       setDeleteConfirmId(null)
       setDeleteConfirmTitle('')
-
-      // Remove from local state
       setDocuments(prev => prev.filter(d => d.id !== docId))
-
-      // If we're viewing the deleted doc, go to /app
-      if (pathname === `/doc/${docId}`) {
-        router.push('/app')
-      }
+      if (pathname === `/doc/${docId}`) router.push('/app')
     } catch (error) {
-      console.error('Error deleting document:', error)
       showToast('Failed to delete document', 'error')
     }
   }
 
-  // Handle exporting all documents as ZIP
   const handleExportAll = async () => {
     if (isExporting) return
     setIsExporting(true)
-    
     try {
-      const { data: allDocs, error } = await supabase
-        .from('documents')
-        .select('*')
-        .order('updated_at', { ascending: false })
-
+      const { data: allDocs, error } = await supabase.from('documents').select('*').order('updated_at', { ascending: false })
       if (error || !allDocs || allDocs.length === 0) {
         showToast(error ? `Export failed: ${error.message}` : 'No documents to export', 'error')
         setIsExporting(false)
         return
       }
-
       const zip = new JSZip()
       const date = new Date().toISOString().split('T')[0]
-
       allDocs.forEach((doc: Document) => {
         const sanitizedTitle = (doc.title || 'untitled').replace(/[^a-z0-9]/gi, '-').toLowerCase()
         const filename = `${sanitizedTitle}__${doc.system}__${doc.status}.md`
         const header = `# ${doc.title || 'Untitled'}\n\n---\nsystem: ${doc.system}\nkind: ${doc.source_kind}\nstatus: ${doc.status}\nai_policy: ${doc.ai_policy}\ncreated: ${doc.created_at}\nupdated: ${doc.updated_at}\n---\n\n`
         zip.file(filename, header + doc.content_md)
       })
-
       const blob = await zip.generateAsync({ type: 'blob' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -237,64 +200,36 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-
       showToast(`Exported ${allDocs.length} documents`, 'success')
     } catch (error) {
-      console.error('Export error:', error)
       showToast('Failed to export documents', 'error')
     } finally {
       setIsExporting(false)
     }
   }
 
-  // Handle deleting account
   const handleDeleteAccount = async () => {
     try {
-      // Delete all documents first
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        showToast('Not authenticated', 'error')
-        return
-      }
-
-      const { error: docsError } = await supabase
-        .from('documents')
-        .delete()
-        .eq('owner_id', user.id)
-
-      if (docsError) {
-        console.error('Error deleting documents:', docsError)
-        showToast(`Failed to delete documents: ${docsError.message}`, 'error')
-        return
-      }
-
-      // Sign out (Supabase doesn't allow self-delete via client SDK,
-      // but we've wiped all user data)
+      if (!user) { showToast('Not authenticated', 'error'); return }
+      const { error: docsError } = await supabase.from('documents').delete().eq('owner_id', user.id)
+      if (docsError) { showToast(`Failed to delete documents: ${docsError.message}`, 'error'); return }
       await supabase.auth.signOut()
-      
       showToast('All data deleted. Account signed out.', 'success')
       setShowDeleteAccount(false)
       router.push('/login')
     } catch (error) {
-      console.error('Error deleting account:', error)
       showToast('Failed to delete account', 'error')
     }
   }
 
-  // Handle creating a new document
   const handleCreateDocument = async () => {
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        showToast('You must be logged in to create a document', 'error')
-        return
-      }
-
+      if (!user) { showToast('You must be logged in to create a document', 'error'); return }
       const { data, error } = await supabase
         .from('documents')
-        .insert([{ 
+        .insert([{
           owner_id: user.id,
           title: 'Untitled',
           content_md: '',
@@ -302,74 +237,66 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
           source_kind: 'note',
           status: 'draft',
           ai_policy: 'deny',
-          style_preset: 'WritersRoom',
+          style_preset: stylePreset,
           tags: []
         }])
         .select()
         .single()
-      
-      if (error) {
-        console.error('Error creating document:', error)
-        showToast(`Failed to create document: ${error.message}`, 'error')
-        return
-      }
-      
-      if (data) {
-        router.push(`/doc/${data.id}`)
-      }
+      if (error) { showToast(`Failed to create document: ${error.message}`, 'error'); return }
+      if (data) router.push(`/doc/${data.id}`)
     } catch (error) {
-      console.error('Error creating document:', error)
       showToast(`Failed to create document: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     }
   }
 
   return (
-    <div 
-      className="flex h-screen" 
-      style={{ backgroundColor: '#f6f5f2' }}
+    <div
+      className="flex h-screen"
+      style={{ backgroundColor: bg }}
       onMouseLeave={() => focusMode && !mouseNearEdge && setSidebarVisible(false)}
     >
       {/* Sidebar */}
-      <div 
-        className={`w-80 border-r border-gray-200 flex flex-col h-full ${
-          focusMode ? 'fixed left-0 top-0 z-50 shadow-2xl' : ''
-        }`}
-        style={{ backgroundColor: '#fafaf9' }}
+      <div
+        className={`w-80 border-r ${border} flex flex-col h-full ${focusMode ? 'fixed left-0 top-0 z-50 shadow-2xl' : ''}`}
+        style={{ backgroundColor: sidebarBg }}
         onMouseLeave={() => focusMode && setSidebarVisible(false)}
       >
-        {/* Sidebar header */}
-        <div className="p-6 border-b border-gray-200">
+        {/* Header */}
+        <div className={`p-6 border-b ${border}`}>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <span className="text-lg opacity-40">ℏ</span>
-              <h1 className="text-lg font-semibold text-gray-900" style={{ letterSpacing: '-0.01em' }}>hbar.ink</h1>
+              <h1 className={`text-lg font-semibold ${textPrimary}`} style={{ letterSpacing: '-0.01em' }}>hbar.ink</h1>
             </div>
             <form action="/auth/signout" method="post">
-              <button 
-                type="submit"
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <button type="submit" className={`text-xs ${textMuted} hover:${textPrimary} transition-colors`}>
                 Sign out
               </button>
             </form>
           </div>
           <button
             onClick={handleCreateDocument}
-            className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 hover:border-gray-400 transition-colors"
+            className={`w-full px-4 py-2 text-sm border transition-colors ${
+              isNight
+                ? 'text-gray-300 hover:text-gray-100 border-gray-600 hover:border-gray-400'
+                : 'text-gray-700 hover:text-gray-900 border-gray-300 hover:border-gray-400'
+            }`}
           >
-            New Document
+            New Document <span className="opacity-40 text-xs ml-1">⌘N</span>
           </button>
         </div>
-        
-        {/* Views */}
-        <div className="p-4 border-b border-gray-200">
+
+        {/* Views + Search */}
+        <div className={`p-4 border-b ${border}`}>
           <div className="flex items-center gap-1 mb-2">
             {savedViews.map(view => (
               <button
                 key={view.name}
                 onClick={() => applyView(view)}
                 className={`px-2 py-1 text-xs transition-colors ${
-                  activeView === view.name ? 'text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'
+                  activeView === view.name
+                    ? `${textPrimary} font-medium`
+                    : `${textSecondary} hover:${textPrimary}`
                 }`}
               >
                 {view.name}
@@ -381,35 +308,33 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-1.5 border-0 bg-white text-sm focus:outline-none focus:ring-0 placeholder-gray-400"
+            className={`w-full px-3 py-1.5 border-0 text-sm focus:outline-none focus:ring-0 bg-transparent ${
+              isNight ? 'text-gray-200 placeholder-gray-600' : 'text-gray-800 placeholder-gray-400'
+            }`}
           />
         </div>
-        
+
         {/* Document list */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-4 text-center text-xs text-gray-400">Loading...</div>
+            <div className={`p-4 text-center text-xs ${textMuted}`}>Loading...</div>
           ) : (
             <>
-              {/* Pinned section */}
+              {/* Pinned */}
               {pinnedDocs.length > 0 && (
                 <div className="mb-2">
-                  <div className="px-4 py-2 text-xs font-medium text-gray-500">Pinned</div>
+                  <div className={`px-4 py-2 text-xs font-medium ${textSecondary}`}>Pinned</div>
                   <ul>
                     {pinnedDocs.map(doc => (
                       <li key={doc.id} className="group relative">
-                        <Link 
+                        <Link
                           href={`/doc/${doc.id}`}
-                          className={`block px-4 py-3 hover:bg-white/50 transition-colors ${
-                            pathname === `/doc/${doc.id}` ? 'bg-white border-l-2 border-gray-400' : ''
-                          }`}
+                          className={`block px-4 py-3 transition-colors ${pathname === `/doc/${doc.id}` ? activeBg : hoverBg}`}
                         >
                           <div className="flex items-start gap-2">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-900 truncate">
-                                {doc.title || 'Untitled'}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <p className={`text-sm truncate ${textPrimary}`}>{doc.title || 'Untitled'}</p>
+                              <div className={`flex items-center gap-2 text-xs ${textMuted}`}>
                                 <span>{doc.system}</span>
                                 <span>·</span>
                                 <span>{doc.status === 'terminal' ? 'sealed' : doc.status}</span>
@@ -417,26 +342,15 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
                             </div>
                             <div className="flex flex-col gap-1">
                               <button
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  togglePin(doc.id)
-                                }}
-                                className="text-gray-600 hover:text-gray-800 transition-colors"
-                                title="Unpin document"
-                              >
-                                📌
-                              </button>
+                                onClick={(e) => { e.preventDefault(); togglePin(doc.id) }}
+                                className={`${isNight ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-800'} transition-colors`}
+                                title="Unpin"
+                              >📌</button>
                               <button
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  setDeleteConfirmId(doc.id)
-                                  setDeleteConfirmTitle(doc.title || 'Untitled')
-                                }}
-                                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="Delete document"
-                              >
-                                🗑
-                              </button>
+                                onClick={(e) => { e.preventDefault(); setDeleteConfirmId(doc.id); setDeleteConfirmTitle(doc.title || 'Untitled') }}
+                                className={`${isNight ? 'text-gray-600' : 'text-gray-300'} hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity`}
+                                title="Delete"
+                              ><TrashIcon /></button>
                             </div>
                           </div>
                         </Link>
@@ -445,28 +359,24 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
                   </ul>
                 </div>
               )}
-              
-              {/* Regular documents */}
+
+              {/* Regular docs */}
               {filteredDocuments.length === 0 && pinnedDocs.length === 0 ? (
-                <div className="p-4 text-center text-xs text-gray-400">
+                <div className={`p-4 text-center text-xs ${textMuted}`}>
                   {searchQuery ? 'No matches' : 'No documents'}
                 </div>
               ) : (
                 <ul>
                   {filteredDocuments.map(doc => (
                     <li key={doc.id} className="group relative">
-                      <Link 
+                      <Link
                         href={`/doc/${doc.id}`}
-                        className={`block px-4 py-3 hover:bg-white/50 transition-colors ${
-                          pathname === `/doc/${doc.id}` ? 'bg-white border-l-2 border-gray-400' : ''
-                        }`}
+                        className={`block px-4 py-3 transition-colors ${pathname === `/doc/${doc.id}` ? activeBg : hoverBg}`}
                       >
                         <div className="flex items-start gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-900 truncate">
-                              {doc.title || 'Untitled'}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <p className={`text-sm truncate ${textPrimary}`}>{doc.title || 'Untitled'}</p>
+                            <div className={`flex items-center gap-2 text-xs ${textMuted}`}>
                               <span>{doc.system}</span>
                               <span>·</span>
                               <span>{doc.status === 'terminal' ? 'sealed' : doc.status}</span>
@@ -477,26 +387,15 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
                           </div>
                           <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={(e) => {
-                                e.preventDefault()
-                                togglePin(doc.id)
-                              }}
-                              className="text-gray-400 hover:text-gray-600"
-                              title="Pin document"
-                            >
-                              📌
-                            </button>
+                              onClick={(e) => { e.preventDefault(); togglePin(doc.id) }}
+                              className={`${isNight ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+                              title="Pin"
+                            >📌</button>
                             <button
-                              onClick={(e) => {
-                                e.preventDefault()
-                                setDeleteConfirmId(doc.id)
-                                setDeleteConfirmTitle(doc.title || 'Untitled')
-                              }}
-                              className="text-gray-300 hover:text-red-500"
-                              title="Delete document"
-                            >
-                              �
-                            </button>
+                              onClick={(e) => { e.preventDefault(); setDeleteConfirmId(doc.id); setDeleteConfirmTitle(doc.title || 'Untitled') }}
+                              className={`${isNight ? 'text-gray-600' : 'text-gray-300'} hover:text-red-500`}
+                              title="Delete"
+                            ><TrashIcon /></button>
                           </div>
                         </div>
                       </Link>
@@ -508,30 +407,34 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {/* Account actions at bottom */}
-        <div className="p-4 border-t border-gray-200 space-y-2">
+        {/* Bottom actions */}
+        <div className={`p-4 border-t ${border} space-y-2`}>
           <button
             onClick={handleExportAll}
             disabled={isExporting}
-            className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-700 hover:bg-white/50 transition-colors rounded"
+            className={`w-full text-left px-3 py-2 text-xs transition-colors rounded ${
+              isNight ? 'text-gray-500 hover:text-gray-300 hover:bg-white/5' : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+            }`}
           >
             {isExporting ? 'Exporting...' : 'Download all as ZIP'}
           </button>
           <button
             onClick={() => setShowDeleteAccount(true)}
-            className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-red-500 transition-colors rounded"
+            className={`w-full text-left px-3 py-2 text-xs transition-colors rounded ${
+              isNight ? 'text-gray-700 hover:text-red-400' : 'text-gray-400 hover:text-red-500'
+            }`}
           >
             Delete account & data
           </button>
         </div>
       </div>
-      
+
       {/* Main content */}
       <div className="flex-1 overflow-y-auto">
         {children}
       </div>
 
-      {/* Delete account confirmation modal */}
+      {/* Delete account modal */}
       {showDeleteAccount && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
@@ -539,19 +442,11 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
             <p className="text-sm text-gray-500 mb-4">
               This will permanently delete <strong>all your documents</strong> and sign you out. This cannot be undone.
             </p>
-            <p className="text-sm text-gray-500 mb-2">
-              We recommend downloading your documents first.
-            </p>
-            <button
-              onClick={handleExportAll}
-              disabled={isExporting}
-              className="mb-4 text-xs text-blue-600 hover:text-blue-800 underline"
-            >
+            <p className="text-sm text-gray-500 mb-2">We recommend downloading your documents first.</p>
+            <button onClick={handleExportAll} disabled={isExporting} className="mb-4 text-xs text-blue-600 hover:text-blue-800 underline">
               {isExporting ? 'Exporting...' : 'Download all as ZIP first'}
             </button>
-            <p className="text-sm text-gray-600 mb-2">
-              Type <strong>DELETE</strong> to confirm:
-            </p>
+            <p className="text-sm text-gray-600 mb-2">Type <strong>DELETE</strong> to confirm:</p>
             <input
               type="text"
               value={deleteAccountConfirmText}
@@ -560,17 +455,10 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
               placeholder="Type DELETE"
             />
             <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => { setShowDeleteAccount(false); setDeleteAccountConfirmText('') }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
-              >
+              <button onClick={() => { setShowDeleteAccount(false); setDeleteAccountConfirmText('') }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
                 Cancel
               </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleteAccountConfirmText !== 'DELETE'}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
+              <button onClick={handleDeleteAccount} disabled={deleteAccountConfirmText !== 'DELETE'} className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed">
                 Delete everything
               </button>
             </div>
@@ -578,7 +466,7 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
+      {/* Delete document modal */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
@@ -587,16 +475,10 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
               <strong>{deleteConfirmTitle}</strong> will be permanently deleted. This cannot be undone.
             </p>
             <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => { setDeleteConfirmId(null); setDeleteConfirmTitle('') }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
-              >
+              <button onClick={() => { setDeleteConfirmId(null); setDeleteConfirmTitle('') }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
                 Cancel
               </button>
-              <button
-                onClick={() => deleteConfirmId && handleDeleteDocument(deleteConfirmId)}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700"
-              >
+              <button onClick={() => deleteConfirmId && handleDeleteDocument(deleteConfirmId)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700">
                 Delete
               </button>
             </div>
