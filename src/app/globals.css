@@ -322,6 +322,28 @@
   background-color: rgba(100, 130, 220, 0.2);
 }
 
+/* Links */
+.ProseMirror a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.ProseMirror a:hover {
+  color: #1d4ed8;
+}
+.tiptap-dark .ProseMirror a {
+  color: #60a5fa;
+}
+.tiptap-dark .ProseMirror a:hover {
+  color: #93c5fd;
+}
+
+/* Ctrl+click to follow links in editor */
+.ProseMirror a[href] {
+  pointer-events: auto;
+}
+
 /* Sealed / terminal state */
 .terminal-document .ProseMirror {
   cursor: default;

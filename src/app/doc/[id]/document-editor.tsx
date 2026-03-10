@@ -11,6 +11,7 @@ import Highlight from '@tiptap/extension-highlight'
 import { Color } from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Underline from '@tiptap/extension-underline'
+import Link from '@tiptap/extension-link'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
@@ -92,6 +93,9 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(null)
+  const [linkInputMode, setLinkInputMode] = useState(false)
+  const [linkInputValue, setLinkInputValue] = useState('')
+  const linkInputRef = useRef<HTMLInputElement>(null)
 
   const { focusMode, toggleFocusMode, setStylePreset: setGlobalPreset } = useFocusMode()
 
@@ -125,6 +129,11 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
       TextStyle,
       Color,
       Underline,
+      Link.configure({
+        openOnClick: false, // don't navigate on click in editor; handled via Ctrl+click
+        autolink: true,     // auto-detect pasted URLs
+        HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' },
+      }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Markdown.configure({
@@ -149,6 +158,27 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
       editor.setEditable(status !== 'terminal')
     }
   }, [editor, status])
+
+  const applyLink = () => {
+    if (!editor) return
+    const url = linkInputValue.trim()
+    if (!url) {
+      editor.chain().focus().unsetLink().run()
+    } else {
+      const href = url.startsWith('http') ? url : `https://${url}`
+      editor.chain().focus().setLink({ href }).run()
+    }
+    setLinkInputMode(false)
+    setLinkInputValue('')
+  }
+
+  const openLinkInput = () => {
+    if (!editor) return
+    const existing = editor.getAttributes('link').href || ''
+    setLinkInputValue(existing)
+    setLinkInputMode(true)
+    setTimeout(() => linkInputRef.current?.focus(), 50)
+  }
 
   // Track selection to show/hide bubble toolbar
   useEffect(() => {
@@ -687,35 +717,63 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
           }}
           onMouseDown={(e) => e.preventDefault()} // keep editor focused
         >
-          <div className={`flex items-center gap-0.5 rounded-lg px-1.5 py-1 shadow-xl border ${
+          <div className={`flex flex-col rounded-lg shadow-xl border overflow-hidden ${
             stylePreset === 'NightInk' ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'
           }`}>
-            <BubbleBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} night={stylePreset === 'NightInk'} title="Bold (⌘B)"><strong>B</strong></BubbleBtn>
-            <BubbleBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} night={stylePreset === 'NightInk'} title="Italic (⌘I)"><em>I</em></BubbleBtn>
-            <BubbleBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} night={stylePreset === 'NightInk'} title="Underline (⌘U)"><span className="underline">U</span></BubbleBtn>
-            <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
-            <BubbleBtn active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} night={stylePreset === 'NightInk'} title="Heading 1">H1</BubbleBtn>
-            <BubbleBtn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} night={stylePreset === 'NightInk'} title="Heading 2">H2</BubbleBtn>
-            <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
-            <BubbleBtn active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight({ color: '#ffd54f' }).run()} night={stylePreset === 'NightInk'} title="Highlight">
-              <span style={{ background: '#ffd54f', borderRadius: 2, padding: '0 3px', color: '#1a1a1a' }}>ab</span>
-            </BubbleBtn>
-            <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
-            {[
-              { color: 'reset', label: 'Default', bg: stylePreset === 'NightInk' ? '#555' : '#ddd' },
-              { color: '#d97706', label: 'Amber', bg: '#d97706' },
-              { color: '#7c3aed', label: 'Violet', bg: '#7c3aed' },
-              { color: '#0284c7', label: 'Sky', bg: '#0284c7' },
-              { color: '#e11d48', label: 'Rose', bg: '#e11d48' },
-            ].map(({ color, label, bg }) => (
-              <button
-                key={color}
-                onClick={() => color === 'reset' ? editor.chain().focus().unsetColor().run() : editor.chain().focus().setColor(color).run()}
-                title={label}
-                className="w-3.5 h-3.5 rounded-full flex-shrink-0 hover:scale-110 transition-transform"
-                style={{ backgroundColor: bg }}
-              />
-            ))}
+            {/* Link input row — shown when link button is clicked */}
+            {linkInputMode && (
+              <div className={`flex items-center gap-1 px-2 py-1 border-b ${stylePreset === 'NightInk' ? 'border-gray-700' : 'border-gray-100'}`}>
+                <span className="text-xs text-gray-400">🔗</span>
+                <input
+                  ref={linkInputRef}
+                  type="text"
+                  value={linkInputValue}
+                  onChange={e => setLinkInputValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); applyLink() }
+                    if (e.key === 'Escape') { e.preventDefault(); setLinkInputMode(false); editor.chain().focus().run() }
+                  }}
+                  placeholder="Paste URL or leave empty to remove"
+                  className={`text-xs outline-none bg-transparent w-48 ${stylePreset === 'NightInk' ? 'text-gray-200 placeholder-gray-600' : 'text-gray-800 placeholder-gray-300'}`}
+                />
+                <button onClick={applyLink} className="text-xs text-blue-500 hover:text-blue-700 font-medium px-1">Apply</button>
+                {editor.isActive('link') && (
+                  <button onClick={() => { editor.chain().focus().unsetLink().run(); setLinkInputMode(false) }} className="text-xs text-red-400 hover:text-red-600 px-1">Remove</button>
+                )}
+              </div>
+            )}
+            {/* Formatting buttons row */}
+            <div className="flex items-center gap-0.5 px-1.5 py-1">
+              <BubbleBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} night={stylePreset === 'NightInk'} title="Bold (⌘B)"><strong>B</strong></BubbleBtn>
+              <BubbleBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} night={stylePreset === 'NightInk'} title="Italic (⌘I)"><em>I</em></BubbleBtn>
+              <BubbleBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} night={stylePreset === 'NightInk'} title="Underline (⌘U)"><span className="underline">U</span></BubbleBtn>
+              <BubbleBtn active={editor.isActive('link')} onClick={openLinkInput} night={stylePreset === 'NightInk'} title="Link (⌘K)">
+                <span style={{ fontSize: '11px' }}>🔗</span>
+              </BubbleBtn>
+              <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
+              <BubbleBtn active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} night={stylePreset === 'NightInk'} title="Heading 1">H1</BubbleBtn>
+              <BubbleBtn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} night={stylePreset === 'NightInk'} title="Heading 2">H2</BubbleBtn>
+              <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
+              <BubbleBtn active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight({ color: '#ffd54f' }).run()} night={stylePreset === 'NightInk'} title="Highlight">
+                <span style={{ background: '#ffd54f', borderRadius: 2, padding: '0 3px', color: '#1a1a1a' }}>ab</span>
+              </BubbleBtn>
+              <div className={`w-px h-4 mx-1 ${stylePreset === 'NightInk' ? 'bg-gray-600' : 'bg-gray-200'}`} />
+              {[
+                { color: 'reset', label: 'Default', bg: stylePreset === 'NightInk' ? '#555' : '#ddd' },
+                { color: '#d97706', label: 'Amber', bg: '#d97706' },
+                { color: '#7c3aed', label: 'Violet', bg: '#7c3aed' },
+                { color: '#0284c7', label: 'Sky', bg: '#0284c7' },
+                { color: '#e11d48', label: 'Rose', bg: '#e11d48' },
+              ].map(({ color, label, bg }) => (
+                <button
+                  key={color}
+                  onClick={() => color === 'reset' ? editor.chain().focus().unsetColor().run() : editor.chain().focus().setColor(color).run()}
+                  title={label}
+                  className="w-3.5 h-3.5 rounded-full flex-shrink-0 hover:scale-110 transition-transform"
+                  style={{ backgroundColor: bg }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -735,6 +793,7 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
                 ['⌘I', 'Italic'],
                 ['⌘U', 'Underline'],
                 ['⌘⇧H', 'Highlight'],
+                ['🔗 in toolbar', 'Add / edit link'],
                 ['Tab', 'Indent'],
                 ['⇧Tab', 'Unindent'],
               ].map(([key, label]) => <ShortcutRow key={key} k={key} label={label} />)}
