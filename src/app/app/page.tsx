@@ -12,13 +12,15 @@ export default async function AppPage() {
     redirect('/login')
   }
 
-  // Fetch the most recent NON-TERMINAL document
+  // Fetch the most recently CREATED non-terminal document.
+  // Using created_at (not updated_at) so a newly created note always wins over
+  // older docs that were just beacon-saved during navigation away from them.
   const { data: documents, error } = await supabase
     .from('documents')
     .select('id, status')
     .eq('owner_id', session.user.id)
     .neq('status', 'terminal')
-    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(1)
   
   // If there's a recent non-terminal document, redirect to it

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { formatDistanceToNow } from 'date-fns'
@@ -80,17 +80,7 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [focusMode])
 
-  // Cmd+N: create new document from anywhere
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
-        e.preventDefault()
-        handleCreateDocument()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  // Cmd+N handler installed after handleCreateDocument is defined (see below)
 
   useEffect(() => {
     if (focusMode && mouseNearEdge) setSidebarVisible(true)
@@ -243,11 +233,33 @@ function SidebarLayoutContent({ children }: { children: React.ReactNode }) {
         .select()
         .single()
       if (error) { showToast(`Failed to create document: ${error.message}`, 'error'); return }
-      if (data) router.push(`/doc/${data.id}`)
+      if (!data) { showToast('Failed to create document — please try again', 'error'); return }
+
+      // Add to sidebar list immediately (don't wait for next fetch)
+      setDocuments(prev => [data as Document, ...prev])
+
+      // Hard navigate so the server component always fetches fresh data for the new doc.
+      // router.push can serve a cached server response that doesn't yet know about the
+      // newly inserted row, causing a silent redirect back to /app and "disappearing" note.
+      window.location.href = `/doc/${data.id}`
     } catch (error) {
       showToast(`Failed to create document: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     }
   }
+
+  // Cmd+N: always calls the latest handleCreateDocument via ref (avoids stale closure)
+  const handleCreateDocumentRef = useRef(handleCreateDocument)
+  handleCreateDocumentRef.current = handleCreateDocument
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault()
+        handleCreateDocumentRef.current()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   return (
     <div
