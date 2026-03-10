@@ -21,22 +21,21 @@ import { useFocusMode } from '@/components/layout/focus-mode-wrapper'
 import { downloadTextFile } from '@/lib/file-utils'
 import { jsPDF } from 'jspdf'
 
-// Tab / Shift-Tab: indent list items, soft-tab in plain paragraphs
+// Tab / Shift-Tab: indent/unindent list items only
+// (Inserting spaces/NBSP breaks markdown serialization — they become &nbsp; entities on reload)
 const TabHandler = Extension.create({
   name: 'tabHandler',
   addKeyboardShortcuts() {
     return {
       Tab: ({ editor }) => {
-        if (editor.isActive('listItem') || editor.isActive('taskItem')) {
-          return editor.commands.sinkListItem('listItem')
-        }
-        return editor.commands.insertContent('\u00A0\u00A0\u00A0\u00A0') // non-breaking spaces (visible indent)
+        if (editor.isActive('listItem')) return editor.commands.sinkListItem('listItem')
+        if (editor.isActive('taskItem')) return editor.commands.sinkListItem('taskItem')
+        return true // consume event (prevent focus leaving editor)
       },
       'Shift-Tab': ({ editor }) => {
-        if (editor.isActive('listItem') || editor.isActive('taskItem')) {
-          return editor.commands.liftListItem('listItem')
-        }
-        return false
+        if (editor.isActive('listItem')) return editor.commands.liftListItem('listItem')
+        if (editor.isActive('taskItem')) return editor.commands.liftListItem('taskItem')
+        return true
       },
     }
   },
@@ -82,6 +81,7 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const pendingSaveRef = useRef<{ content: string; title: string } | null>(null)
   const saveInProgressRef = useRef(false)
   const [showCmdK, setShowCmdK] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -105,14 +105,17 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
   contentRef.current = content
   titleRef.current = title
 
-  // Emergency save on unmount — fires even when navigating away mid-edit
-  // Uses fire-and-forget (no await) so Next.js navigation doesn't kill it
+  // Emergency save on unmount — always fires when navigating away
+  // Direct Supabase call (bypasses saveDocument guards) so nothing is ever dropped
   useEffect(() => {
     return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
       supabase.from('documents').update({
         content_md: contentRef.current,
         title: titleRef.current,
-      }).eq('id', docRow.id).then(() => {})
+      }).eq('id', docRow.id).then(() => {
+        localStorage.removeItem(`draft-${docRow.id}`)
+      })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -328,8 +331,16 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
     if (showCmdK) searchDocuments()
   }, [searchQuery, showCmdK])
 
-  const saveDocument = async () => {
-    if (saveInProgressRef.current) return
+  const saveDocument = async (overrideContent?: string, overrideTitle?: string) => {
+    const saveContent = overrideContent ?? content
+    const saveTitle = overrideTitle ?? title
+
+    // If a save is already running, queue this content so it saves after
+    if (saveInProgressRef.current) {
+      pendingSaveRef.current = { content: saveContent, title: saveTitle }
+      return
+    }
+
     saveInProgressRef.current = true
     setIsSaving(true)
     setSaveError(null)
@@ -338,8 +349,8 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
       const { error } = await supabase
         .from('documents')
         .update({
-          title,
-          content_md: content,
+          title: saveTitle,
+          content_md: saveContent,
           style_preset: stylePreset,
           status,
           system,
@@ -365,6 +376,13 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
     } finally {
       setIsSaving(false)
       saveInProgressRef.current = false
+
+      // If content changed while save was running, save it now
+      if (pendingSaveRef.current) {
+        const pending = pendingSaveRef.current
+        pendingSaveRef.current = null
+        saveDocument(pending.content, pending.title)
+      }
     }
   }
 
