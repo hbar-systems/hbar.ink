@@ -105,17 +105,30 @@ function DocumentEditorContent({ document: docRow }: { document: DocType }) {
   contentRef.current = content
   titleRef.current = title
 
-  // Emergency save on unmount — always fires when navigating away
-  // Direct Supabase call (bypasses saveDocument guards) so nothing is ever dropped
+  // Beacon save on unmount — guaranteed to complete even during navigation or tab close.
+  // sendBeacon() is the only fetch mechanism browsers promise won't be cancelled mid-navigation.
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-      supabase.from('documents').update({
+
+      const payload = JSON.stringify({
+        id: docRow.id,
         content_md: contentRef.current,
         title: titleRef.current,
-      }).eq('id', docRow.id).then(() => {
-        localStorage.removeItem(`draft-${docRow.id}`)
       })
+
+      const blob = new Blob([payload], { type: 'application/json' })
+      const sent = navigator.sendBeacon('/api/documents/beacon', blob)
+
+      if (!sent) {
+        // Fallback: keepalive fetch also survives navigation (64KB limit same as beacon)
+        fetch('/api/documents/beacon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true,
+        }).catch(() => {})
+      }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
