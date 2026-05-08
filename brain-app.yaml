@@ -1,0 +1,48 @@
+# hbar.ink — brain-app manifest
+#
+# Single-user thought-drop instrument, packaged as an installable brain app.
+# Drops are stored in the iframe's localStorage in v0; brain-memory.write
+# integration ships next.
+#
+# Schema: https://hbar.systems/schemas/brain/app.schema.json
+# Created: 2026-05-08
+
+dialect: brain-app/v1
+id: hbar-ink
+name: hbar.ink
+version: 0.1.0
+description: Single-user thought-drop instrument. One job — absorb compressed thoughts fast.
+license: AGPL-3.0
+
+author:
+  name: hbar
+  url: https://hbar.systems
+  contact: hello@hbar.systems
+
+repo: https://github.com/hbar-systems/hbar.ink
+
+tab:
+  label: Ink
+  route: /ink
+  order: 25
+
+entries:
+  ui_bundle: brain-app-dist/
+
+# v0 ships with NO permissions — drops are localStorage-only inside the
+# iframe. The brain-memory.write integration is the next ship; when it
+# lands, the manifest gains:
+#
+#   permissions:
+#     - memory.write
+#   requires_layers:
+#     - layer: episodic
+#       mode: append
+#   requires_endpoints:
+#     - POST /memory/append
+#
+# Until then, the manifest is intentionally permission-free so the install
+# approval screen is honest about what the app actually does.
+
+engines:
+  brainfoundry-nous: ">=0.6.0"

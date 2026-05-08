@@ -1,0 +1,124 @@
+/* hbar.ink — minimal drop instrument
+ * Self-contained, no external fonts/CDN. Reads CSS vars from parent if
+ * available (when running inside the brain iframe host); falls back to
+ * sensible defaults for standalone open-from-disk testing. */
+
+:root {
+  --ink-bg:      #0e0c0b;
+  --ink-surface: #161310;
+  --ink-text:    #e8e0d5;
+  --ink-muted:   #6b5f52;
+  --ink-accent:  #c9a96e;
+  --ink-border:  #2a2420;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink-bg);
+  color: var(--ink-text);
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  height: 100%;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#bf-meta {
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-family: ui-monospace, "DM Mono", monospace;
+  letter-spacing: 0.02em;
+  text-align: right;
+}
+
+#drop-input {
+  width: 100%;
+  min-height: 220px;
+  background: var(--ink-surface);
+  color: var(--ink-text);
+  border: 1px solid var(--ink-border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+#drop-input:focus {
+  border-color: var(--ink-accent);
+}
+
+#status {
+  font-size: 12px;
+  color: var(--ink-muted);
+  font-family: ui-monospace, "DM Mono", monospace;
+  min-height: 14px;
+}
+
+#drops {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.drop {
+  background: var(--ink-surface);
+  border: 1px solid var(--ink-border);
+  border-radius: 6px;
+  padding: 14px 16px;
+}
+
+.drop-text {
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: var(--ink-text);
+}
+
+.drop-meta {
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-family: ui-monospace, "DM Mono", monospace;
+  margin-top: 8px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.drop-meta button {
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  color: var(--ink-muted);
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.drop-meta button:hover {
+  color: var(--ink-text);
+  border-color: var(--ink-accent);
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--ink-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 20px 0;
+}
