@@ -30,6 +30,7 @@
     bfMeta: document.getElementById('bf-meta'),
     infoToggle: document.getElementById('info-toggle'),
     infoPanel: document.getElementById('info-panel'),
+    dropBtn: document.getElementById('drop-btn'),
   }
 
   // ---------- storage ----------
@@ -112,7 +113,7 @@
       empty.className = 'empty'
       empty.innerHTML =
         '<span class="empty-line">no drops yet.</span>' +
-        '<span class="empty-line">type a thought above. Cmd+↵ to seal.</span>' +
+        '<span class="empty-line">type a thought above and hit drop.</span>' +
         '<span class="empty-line empty-faint">drops route to your brain\'s episodic memory.</span>'
       els.drops.appendChild(empty)
       return
@@ -247,6 +248,9 @@
     renderDrops()
   }
 
+  // Click is the primary affordance — universal across keyboards. The
+  // modifier-Enter keyboard shortcut stays as a hidden power-user thing.
+  els.dropBtn.addEventListener('click', () => commit())
   els.input.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault()
@@ -255,6 +259,10 @@
   })
   els.destination.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault()
+      commit()
+    }
+    if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
       e.preventDefault()
       commit()
     }

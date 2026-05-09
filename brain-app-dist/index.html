@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.4.0">
+  <link rel="stylesheet" href="./styles.css?v=0.5.0">
 </head>
 <body class="t-writers-room s-m">
   <header class="ink-header">
@@ -38,12 +38,10 @@
       </div>
     </div>
     <div class="ink-info-panel" id="info-panel" hidden>
-      hbar.ink is a single-user thought-drop instrument. type a thought,
-      press <span style="font-family:var(--mono);">⌘↵</span>, it seals.
-      drops route into your brain's episodic memory layer and feed RAG —
-      the brain remembers, you can ask it later. local browser copy is
-      kept too so the surface is fast even when the network blinks.
-      part of <a href="https://hbar.systems" target="_blank" rel="noopener noreferrer" style="color: var(--muted);">hbar.systems</a>.
+      hbar.ink is a single-user thought-drop instrument.
+      type a thought, hit <b>drop</b>, and it routes into your brain's
+      episodic memory — the brain remembers, you can ask it later in chat.
+      part of <a href="https://hbar.systems" target="_blank" rel="noopener noreferrer">hbar.systems</a>.
     </div>
   </header>
 
@@ -65,7 +63,7 @@
           spellcheck="false"
         />
         <span id="status" class="ink-status"></span>
-        <span class="ink-hint-key">⌘↵ to drop</span>
+        <button id="drop-btn" class="ink-drop-btn" type="button">drop</button>
       </div>
     </section>
 
@@ -74,6 +72,6 @@
     </section>
   </main>
 
-  <script src="./main.js?v=0.4.0"></script>
+  <script src="./main.js?v=0.5.0"></script>
 </body>
 </html>

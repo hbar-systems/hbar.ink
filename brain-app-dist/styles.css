@@ -181,6 +181,11 @@ html, body {
   color: var(--text-soft);
 }
 .ink-info-panel[hidden] { display: none; }
+.ink-info-panel a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.ink-info-panel a:hover { color: var(--text); }
 
 /* ---------- main + sections ---------- */
 .ink-main { display: flex; flex-direction: column; }
@@ -250,12 +255,31 @@ html, body {
   text-align: right;
 }
 
-.ink-hint-key {
-  letter-spacing: 0.05em;
+.ink-drop-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 6px 18px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  text-transform: lowercase;
+}
+.ink-drop-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.ink-drop-btn:active {
+  background: var(--surface);
+}
+.ink-drop-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border);
   color: var(--faint);
-  white-space: nowrap;
 }
 
 /* ---------- drop list ---------- */
