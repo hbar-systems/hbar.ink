@@ -1,124 +1,182 @@
-/* hbar.ink — minimal drop instrument
- * Self-contained, no external fonts/CDN. Reads CSS vars from parent if
- * available (when running inside the brain iframe host); falls back to
- * sensible defaults for standalone open-from-disk testing. */
-
-:root {
-  --ink-bg:      #0e0c0b;
-  --ink-surface: #161310;
-  --ink-text:    #e8e0d5;
-  --ink-muted:   #6b5f52;
-  --ink-accent:  #c9a96e;
-  --ink-border:  #2a2420;
-}
+/* hbar.ink — Writer's Room style.
+ * Mirrors the public hbar.ink site: cream paper, Spectral serif, gray hierarchy.
+ * Lives inside an iframe in the brain UI; the host's dark nav surrounds it,
+ * the iframe is its own quiet writing space.
+ */
 
 * { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--ink-bg);
-  color: var(--ink-text);
-  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  background-color: #f6f5f2;
+  color: #111827;
+  font-family: 'Spectral', Georgia, 'Times New Roman', serif;
+  -webkit-font-smoothing: antialiased;
   height: 100%;
+  min-height: 100vh;
 }
 
-main {
-  max-width: 720px;
+/* Hide scrollbars (content still scrolls) — matches the site's posture */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar { display: none; }
+
+/* ---------- header ---------- */
+.ink-header {
+  padding: 24px 24px 16px;
+}
+
+.ink-row {
+  max-width: 768px;
   margin: 0 auto;
-  padding: 32px 24px;
-  min-height: 100%;
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-#bf-meta {
-  font-size: 11px;
-  color: var(--ink-muted);
-  font-family: ui-monospace, "DM Mono", monospace;
-  letter-spacing: 0.02em;
-  text-align: right;
-}
-
-#drop-input {
-  width: 100%;
-  min-height: 220px;
-  background: var(--ink-surface);
-  color: var(--ink-text);
-  border: 1px solid var(--ink-border);
-  border-radius: 8px;
-  padding: 18px 20px;
-  font-family: inherit;
-  font-size: 18px;
-  line-height: 1.55;
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.15s ease;
-}
-
-#drop-input:focus {
-  border-color: var(--ink-accent);
-}
-
-#status {
+  justify-content: space-between;
+  align-items: center;
   font-size: 12px;
-  color: var(--ink-muted);
-  font-family: ui-monospace, "DM Mono", monospace;
-  min-height: 14px;
+  color: #6b7280;
 }
 
-#drops {
+.ink-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ink-glyph {
+  opacity: 0.4;
+  font-size: 14px;
+}
+
+.ink-name {
+  letter-spacing: 0.05em;
+}
+
+.ink-meta {
+  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #9ca3af;
+}
+
+/* ---------- main + sections ---------- */
+.ink-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 8px;
 }
 
-.drop {
-  background: var(--ink-surface);
-  border: 1px solid var(--ink-border);
-  border-radius: 6px;
-  padding: 14px 16px;
+.ink-section {
+  padding: 24px;
+}
+
+.ink-section + .ink-section {
+  padding-top: 8px;
+}
+
+.ink-section > * {
+  max-width: 768px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ink-drops {
+  padding-bottom: 64px;
+}
+
+/* ---------- input ---------- */
+#drop-input {
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  background: transparent;
+  color: #111827;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 8px 0;
+  font-family: inherit;
+  font-size: 19px;
+  line-height: 1.6;
+  caret-color: #111827;
+}
+
+#drop-input::placeholder {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.ink-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.ink-hint-key {
+  letter-spacing: 0.05em;
+  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+}
+
+/* ---------- drop list ---------- */
+.ink-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ink-list li {
+  border-top: 1px solid #e5e7eb;
+  padding: 16px 0;
+}
+
+.ink-list li:last-child {
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .drop-text {
-  font-size: 15px;
-  line-height: 1.55;
+  color: #1f2937;
   white-space: pre-wrap;
-  color: var(--ink-text);
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .drop-meta {
-  font-size: 11px;
-  color: var(--ink-muted);
-  font-family: ui-monospace, "DM Mono", monospace;
-  margin-top: 8px;
   display: flex;
-  gap: 12px;
   align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #9ca3af;
+  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  letter-spacing: 0.02em;
 }
 
 .drop-meta button {
   background: transparent;
-  border: 1px solid var(--ink-border);
-  color: var(--ink-muted);
-  border-radius: 4px;
-  font-size: 11px;
-  padding: 2px 8px;
+  border: none;
+  color: #9ca3af;
+  font: inherit;
+  padding: 0;
   cursor: pointer;
-  font-family: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
 }
 
 .drop-meta button:hover {
-  color: var(--ink-text);
-  border-color: var(--ink-accent);
+  color: #374151;
 }
 
+/* ---------- empty state ---------- */
 .empty {
-  font-size: 13px;
-  color: var(--ink-muted);
+  font-size: 12px;
+  color: #9ca3af;
   font-style: italic;
   text-align: center;
-  padding: 20px 0;
+  padding: 32px 0;
+  letter-spacing: 0.02em;
 }

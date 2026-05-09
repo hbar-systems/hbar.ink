@@ -4,20 +4,41 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>hbar.ink</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <main>
-    <header id="bf-meta" hidden></header>
-    <textarea
-      id="drop-input"
-      placeholder="Drop a thought. Cmd+Enter to seal it."
-      autofocus
-      spellcheck="false"
-    ></textarea>
-    <div id="status" aria-live="polite"></div>
-    <section id="drops" aria-label="Recent drops"></section>
+  <header class="ink-header">
+    <div class="ink-row">
+      <div class="ink-brand">
+        <span class="ink-glyph">ℏ</span>
+        <span class="ink-name">hbar.ink</span>
+      </div>
+      <div class="ink-meta" id="bf-meta"></div>
+    </div>
+  </header>
+
+  <main class="ink-main">
+    <section class="ink-section">
+      <textarea
+        id="drop-input"
+        placeholder="Drop a thought."
+        autofocus
+        spellcheck="false"
+      ></textarea>
+      <div class="ink-hint">
+        <span id="status"></span>
+        <span class="ink-hint-key">⌘↵ to drop</span>
+      </div>
+    </section>
+
+    <section class="ink-section ink-drops" aria-label="Recent drops">
+      <ul id="drops" class="ink-list"></ul>
+    </section>
   </main>
+
   <script src="./main.js"></script>
 </body>
 </html>

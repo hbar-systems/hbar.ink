@@ -72,16 +72,15 @@
     els.drops.innerHTML = ''
 
     if (drops.length === 0) {
-      const empty = document.createElement('div')
+      const empty = document.createElement('li')
       empty.className = 'empty'
-      empty.textContent = 'No drops yet. The first thought you commit lands here.'
+      empty.textContent = 'No drops yet.'
       els.drops.appendChild(empty)
       return
     }
 
     drops.slice(0, RECENT_LIMIT).forEach(d => {
-      const el = document.createElement('article')
-      el.className = 'drop'
+      const li = document.createElement('li')
 
       const text = document.createElement('div')
       text.className = 'drop-text'
@@ -100,9 +99,9 @@
 
       meta.appendChild(time)
       meta.appendChild(del)
-      el.appendChild(text)
-      el.appendChild(meta)
-      els.drops.appendChild(el)
+      li.appendChild(text)
+      li.appendChild(meta)
+      els.drops.appendChild(li)
     })
   }
 
@@ -143,11 +142,10 @@
         callBridge('meta.brain_info'),
       ])
       if (appReply.ok && brainReply.ok) {
-        els.meta.hidden = false
-        els.meta.textContent = `${appReply.result.name} v${appReply.result.version} · drops on ${brainReply.result.name}`
+        els.meta.textContent = `v${appReply.result.version} · drops on ${brainReply.result.name}`
       }
     } catch {
-      // Standalone-load (no parent host): leave header hidden.
+      // Standalone-load (no parent host): leave the meta line empty.
     }
   }
 
