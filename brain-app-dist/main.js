@@ -1,4 +1,4 @@
-// hbar.ink — brain-app v0.3.
+// hbar.ink — brain-app v0.4.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
 // destination, ts, brainId? }. Storage is localStorage (immediate UI)
@@ -16,6 +16,9 @@
   'use strict'
 
   const STORAGE_KEY = 'hbar-ink-drops-v3'
+  const THEME_KEY = 'hbar-ink-theme'
+  const SIZE_KEY = 'hbar-ink-size'
+  const INFO_KEY = 'hbar-ink-info-seen'
   const RECENT_LIMIT = 20
 
   const els = {
@@ -25,6 +28,8 @@
     drops: document.getElementById('drops'),
     today: document.getElementById('count-today'),
     bfMeta: document.getElementById('bf-meta'),
+    infoToggle: document.getElementById('info-toggle'),
+    infoPanel: document.getElementById('info-panel'),
   }
 
   // ---------- storage ----------
@@ -105,7 +110,10 @@
     if (drops.length === 0) {
       const empty = document.createElement('li')
       empty.className = 'empty'
-      empty.textContent = 'no drops yet. thoughts land here.'
+      empty.innerHTML =
+        '<span class="empty-line">no drops yet.</span>' +
+        '<span class="empty-line">type a thought above. Cmd+↵ to seal.</span>' +
+        '<span class="empty-line empty-faint">drops route to your brain\'s episodic memory.</span>'
       els.drops.appendChild(empty)
       return
     }
@@ -252,7 +260,72 @@
     }
   })
 
+  // ---------- theme + size pickers ----------
+  function applyTheme(themeClass) {
+    const all = ['t-writers-room', 't-night-ink', 't-academia']
+    document.body.classList.remove(...all)
+    document.body.classList.add(themeClass)
+    document.querySelectorAll('.ink-picker [data-theme]').forEach(b => {
+      b.classList.toggle('active', b.dataset.theme === themeClass)
+    })
+    try { localStorage.setItem(THEME_KEY, themeClass) } catch {}
+  }
+
+  function applySize(sizeClass) {
+    const all = ['s-s', 's-m', 's-l']
+    document.body.classList.remove(...all)
+    document.body.classList.add(sizeClass)
+    document.querySelectorAll('.ink-picker [data-size]').forEach(b => {
+      b.classList.toggle('active', b.dataset.size === sizeClass)
+    })
+    try { localStorage.setItem(SIZE_KEY, sizeClass) } catch {}
+  }
+
+  document.querySelectorAll('.ink-picker [data-theme]').forEach(b => {
+    b.addEventListener('click', () => applyTheme(b.dataset.theme))
+  })
+  document.querySelectorAll('.ink-picker [data-size]').forEach(b => {
+    b.addEventListener('click', () => applySize(b.dataset.size))
+  })
+
+  function bootPickers() {
+    let theme = 't-writers-room'
+    let size = 's-m'
+    try {
+      const t = localStorage.getItem(THEME_KEY)
+      if (t === 't-writers-room' || t === 't-night-ink' || t === 't-academia') theme = t
+      const s = localStorage.getItem(SIZE_KEY)
+      if (s === 's-s' || s === 's-m' || s === 's-l') size = s
+    } catch {}
+    applyTheme(theme)
+    applySize(size)
+  }
+
+  // ---------- info panel ----------
+  function setInfoOpen(open) {
+    if (open) {
+      els.infoPanel.removeAttribute('hidden')
+      try { localStorage.setItem(INFO_KEY, '1') } catch {}
+    } else {
+      els.infoPanel.setAttribute('hidden', '')
+    }
+  }
+
+  els.infoToggle.addEventListener('click', () => {
+    setInfoOpen(els.infoPanel.hasAttribute('hidden'))
+  })
+
+  function bootInfo() {
+    // Show info panel automatically on first visit ever — once dismissed,
+    // it stays closed unless the user clicks ? again.
+    let seen = false
+    try { seen = localStorage.getItem(INFO_KEY) === '1' } catch {}
+    if (!seen && readDrops().length === 0) setInfoOpen(true)
+  }
+
   // ---------- boot ----------
+  bootPickers()
+  bootInfo()
   renderDrops()
   loadHeaderMeta()
 })()

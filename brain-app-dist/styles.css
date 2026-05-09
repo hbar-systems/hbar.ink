@@ -1,20 +1,68 @@
-/* hbar.ink — brain-app v0.2.
- * Drop instrument with destination tag, Phase 1 Writer's Room typography.
- * Lives in an iframe; the brain's dark nav surrounds it; the iframe is
- * its own quiet writing space.
+/* hbar.ink — brain-app v0.4.
+ * Three themes (Writer's Room / Night Ink / Academia), three font sizes,
+ * Phase 1 typography. Lives in an iframe; the brain's nav surrounds it.
  */
+
+:root {
+  /* Default = Writer's Room */
+  --bg:        #f6f5f2;
+  --surface:   rgba(255,255,255,0.45);
+  --text:      #111827;
+  --text-soft: #1f2937;
+  --muted:     #6b7280;
+  --faint:     #9ca3af;
+  --whisper:   #c0bdb5;
+  --border:    #e5e7eb;
+  --hairline:  #ece9e3;
+  --accent:    #8a6f48;
+  --serif:     'Spectral', Georgia, 'Times New Roman', serif;
+  --mono:      ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  --size-base: 19px;
+  --size-drop: 16px;
+}
+
+body.t-night-ink {
+  --bg:        #1a1a1a;
+  --surface:   rgba(255,255,255,0.04);
+  --text:      #e8e0d5;
+  --text-soft: #d6cdbf;
+  --muted:     #948a7c;
+  --faint:     #6b6358;
+  --whisper:   #4a4339;
+  --border:    #2a2521;
+  --hairline:  #221d19;
+  --accent:    #c9a96e;
+}
+
+body.t-academia {
+  --bg:        #efe9d9;
+  --surface:   rgba(255,255,255,0.35);
+  --text:      #2a221a;
+  --text-soft: #3a2f24;
+  --muted:     #6f5d49;
+  --faint:     #8e7c66;
+  --whisper:   #b8a890;
+  --border:    #d8cdb6;
+  --hairline:  #e3d9c3;
+  --accent:    #7a3a2a;
+}
+
+body.s-s { --size-base: 17px; --size-drop: 14px; }
+body.s-m { --size-base: 19px; --size-drop: 16px; }
+body.s-l { --size-base: 22px; --size-drop: 18px; }
 
 * { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   padding: 0;
-  background-color: #f6f5f2;
-  color: #111827;
-  font-family: 'Spectral', Georgia, 'Times New Roman', serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--serif);
   -webkit-font-smoothing: antialiased;
   height: 100%;
   min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {
@@ -25,7 +73,7 @@ html, body {
 
 /* ---------- header ---------- */
 .ink-header {
-  padding: 24px 24px 12px;
+  padding: 24px 32px 8px;
 }
 
 .ink-row {
@@ -33,10 +81,13 @@ html, body {
   margin: 0 auto;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--muted);
+  gap: 16px;
 }
+
+.ink-brand-block { display: flex; flex-direction: column; gap: 4px; }
 
 .ink-brand {
   display: flex;
@@ -44,72 +95,124 @@ html, body {
   gap: 8px;
 }
 
-.ink-glyph {
-  opacity: 0.4;
-  font-size: 14px;
-}
-
+.ink-glyph { opacity: 0.4; font-size: 14px; }
 .ink-name {
   letter-spacing: 0.05em;
+  color: var(--text);
+}
+
+.ink-tagline {
+  font-style: italic;
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0.01em;
 }
 
 .ink-meta {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.ink-counter {
-  letter-spacing: 0.02em;
-}
+.ink-counter { letter-spacing: 0.02em; }
 
 .ink-bf {
-  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.02em;
-  color: #9ca3af;
+  color: var(--faint);
 }
+
+/* theme + size cycle pickers */
+.ink-pickers {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ink-picker {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ink-picker button {
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ink-picker button:hover { color: var(--text); }
+.ink-picker button.active {
+  background: var(--surface);
+  color: var(--text);
+}
+.ink-picker button + button { border-left: 1px solid var(--border); }
+
+.ink-info {
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  cursor: pointer;
+  padding: 0 2px;
+}
+.ink-info:hover { color: var(--text); }
+
+.ink-info-panel {
+  max-width: 768px;
+  margin: 0 auto 8px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-soft);
+}
+.ink-info-panel[hidden] { display: none; }
 
 /* ---------- main + sections ---------- */
-.ink-main {
-  display: flex;
-  flex-direction: column;
-}
+.ink-main { display: flex; flex-direction: column; }
 
-.ink-section {
-  padding: 16px 24px;
-}
-
+.ink-section { padding: 12px 32px; }
 .ink-section > * {
   max-width: 768px;
   margin-left: auto;
   margin-right: auto;
 }
-
-.ink-drops {
-  padding-bottom: 96px;
-}
+.ink-drops { padding-bottom: 96px; }
 
 /* ---------- instrument (textarea + destination + hint) ---------- */
 #drop-input {
   display: block;
   width: 100%;
-  min-height: 160px;
+  min-height: 200px;
   background: transparent;
-  color: #111827;
+  color: var(--text);
   border: none;
   outline: none;
   resize: none;
-  padding: 8px 0;
+  padding: 24px 0 8px;
   font-family: inherit;
-  font-size: 24px;
+  font-size: var(--size-base);
   line-height: 1.55;
   letter-spacing: -0.005em;
-  caret-color: #111827;
+  caret-color: var(--text);
 }
 
 #drop-input::placeholder {
-  color: #9ca3af;
+  color: var(--whisper);
   font-style: italic;
 }
 
@@ -118,7 +221,7 @@ html, body {
   align-items: center;
   gap: 16px;
   padding-top: 12px;
-  border-top: 1px solid #ece9e3;
+  border-top: 1px solid var(--hairline);
   margin-top: 4px;
 }
 
@@ -128,53 +231,47 @@ html, body {
   border: none;
   outline: none;
   padding: 4px 0;
-  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  font-family: var(--mono);
   font-size: 12px;
-  color: #4b5563;
+  color: var(--text-soft);
   letter-spacing: 0.01em;
 }
 
 #destination::placeholder {
-  color: #c0bdb5;
+  color: var(--whisper);
   font-style: italic;
 }
 
 .ink-status {
   font-size: 11px;
-  color: #9ca3af;
-  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  color: var(--faint);
+  font-family: var(--mono);
   min-width: 40px;
   text-align: right;
 }
 
 .ink-hint-key {
   letter-spacing: 0.05em;
-  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  font-family: var(--mono);
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--faint);
   white-space: nowrap;
 }
 
 /* ---------- drop list ---------- */
-.ink-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
+.ink-list { list-style: none; margin: 0; padding: 0; }
 
 .ink-list li {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   padding: 18px 0;
 }
 
-.ink-list li:last-child {
-  border-bottom: 1px solid #e5e7eb;
-}
+.ink-list li:last-child { border-bottom: 1px solid var(--border); }
 
 .drop-text {
-  color: #1f2937;
+  color: var(--text-soft);
   white-space: pre-wrap;
-  font-size: 16px;
+  font-size: var(--size-drop);
   line-height: 1.65;
 }
 
@@ -184,38 +281,23 @@ html, body {
   gap: 14px;
   margin-top: 10px;
   font-size: 11px;
-  color: #9ca3af;
-  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  color: var(--faint);
+  font-family: var(--mono);
   letter-spacing: 0.02em;
   flex-wrap: wrap;
 }
 
-.drop-dest {
-  color: #6b7280;
-}
+.drop-dest { color: var(--muted); }
+.drop-dest.empty { color: var(--whisper); font-style: italic; }
 
-.drop-dest.empty {
-  color: #c0bdb5;
-  font-style: italic;
-}
-
-.drop-brain {
-  color: #9ca3af;
-}
-
-.drop-brain.saved {
-  color: #6b7280;
-}
-
-.drop-brain.pending {
-  color: #c0bdb5;
-  font-style: italic;
-}
+.drop-brain { color: var(--faint); }
+.drop-brain.saved { color: var(--muted); }
+.drop-brain.pending { color: var(--whisper); font-style: italic; }
 
 .drop-meta button {
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: var(--faint);
   font: inherit;
   padding: 0;
   cursor: pointer;
@@ -225,16 +307,17 @@ html, body {
   margin-left: auto;
 }
 
-.drop-meta button:hover {
-  color: #4b5563;
-}
+.drop-meta button:hover { color: var(--text-soft); }
 
 /* ---------- empty state ---------- */
 .empty {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--faint);
   font-style: italic;
   text-align: center;
   padding: 48px 0;
   letter-spacing: 0.02em;
+  line-height: 1.7;
 }
+.empty .empty-line { display: block; margin: 4px 0; }
+.empty .empty-faint { color: var(--whisper); font-size: 11px; font-family: var(--mono); font-style: normal; letter-spacing: 0.04em; }

@@ -6,20 +6,44 @@
   <title>hbar.ink</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@300;400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.3.0">
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=0.4.0">
 </head>
-<body>
+<body class="t-writers-room s-m">
   <header class="ink-header">
     <div class="ink-row">
-      <div class="ink-brand">
-        <span class="ink-glyph">ℏ</span>
-        <span class="ink-name">hbar.ink</span>
+      <div class="ink-brand-block">
+        <div class="ink-brand">
+          <span class="ink-glyph">ℏ</span>
+          <span class="ink-name">hbar.ink</span>
+        </div>
+        <span class="ink-tagline">a single-user thought-drop instrument</span>
       </div>
       <div class="ink-meta">
+        <div class="ink-pickers">
+          <div class="ink-picker" role="group" aria-label="theme">
+            <button data-theme="t-writers-room" title="Writer's Room">W</button>
+            <button data-theme="t-night-ink" title="Night Ink">N</button>
+            <button data-theme="t-academia" title="Academia">A</button>
+          </div>
+          <div class="ink-picker" role="group" aria-label="font size">
+            <button data-size="s-s" title="small">S</button>
+            <button data-size="s-m" title="medium">M</button>
+            <button data-size="s-l" title="large">L</button>
+          </div>
+        </div>
+        <button class="ink-info" id="info-toggle" title="what is this?">?</button>
         <span id="count-today" class="ink-counter">0 today</span>
         <span id="bf-meta" class="ink-bf"></span>
       </div>
+    </div>
+    <div class="ink-info-panel" id="info-panel" hidden>
+      hbar.ink is a single-user thought-drop instrument. type a thought,
+      press <span style="font-family:var(--mono);">⌘↵</span>, it seals.
+      drops route into your brain's episodic memory layer and feed RAG —
+      the brain remembers, you can ask it later. local browser copy is
+      kept too so the surface is fast even when the network blinks.
+      part of <a href="https://hbar.systems" target="_blank" rel="noopener noreferrer" style="color: var(--muted);">hbar.systems</a>.
     </div>
   </header>
 
@@ -50,6 +74,6 @@
     </section>
   </main>
 
-  <script src="./main.js?v=0.3.0"></script>
+  <script src="./main.js?v=0.4.0"></script>
 </body>
 </html>
