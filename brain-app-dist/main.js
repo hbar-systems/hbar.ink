@@ -1,43 +1,66 @@
-// hbar.ink — brain-app v0.4.
+// hbar.ink — brain-app v0.6.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
-// destination, ts, brainId? }. Storage is localStorage (immediate UI)
-// AND the brain's episodic memory layer via the bridge memory.write
-// intent. brainId is set when the brain accepts the write.
+// destination, kind, ts, brainId?, pinned }. Storage is localStorage
+// (immediate UI) AND the brain's episodic memory layer via the bridge
+// memory.write intent.
 //
-// Bridge usage (v0.3):
+// Bridge usage (v0.6):
 //   meta.app_info  — header version display
 //   meta.brain_info — header brain-name display
-//   memory.write   — append the drop into the brain's episodic layer.
+//   memory.write   — append the drop into the brain's episodic layer
 //                    payload: { layer, content, source, metadata }
-//                    success: result.id is the brain-side memory id.
+//                    success: result.id is the brain-side memory id
 
 (() => {
   'use strict'
 
-  const STORAGE_KEY = 'hbar-ink-drops-v3'
+  const STORAGE_KEY = 'hbar-ink-drops-v6'
   const THEME_KEY = 'hbar-ink-theme'
   const SIZE_KEY = 'hbar-ink-size'
   const INFO_KEY = 'hbar-ink-info-seen'
-  const RECENT_LIMIT = 20
+  const FOCUS_KEY = 'hbar-ink-focus'
+  const RECENT_LIMIT = 30
 
   const els = {
     input: document.getElementById('drop-input'),
     destination: document.getElementById('destination'),
     status: document.getElementById('status'),
     drops: document.getElementById('drops'),
-    today: document.getElementById('count-today'),
+    counter: document.getElementById('counter'),
     bfMeta: document.getElementById('bf-meta'),
     infoToggle: document.getElementById('info-toggle'),
     infoPanel: document.getElementById('info-panel'),
     dropBtn: document.getElementById('drop-btn'),
+    presets: document.getElementById('presets'),
+    focusToggle: document.getElementById('focus-toggle'),
   }
+
+  // Track current source-kind picked from the kind preset row (null = unset)
+  let currentKind = null
 
   // ---------- storage ----------
   function readDrops() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      if (!raw) return []
+      if (!raw) {
+        // One-time migration from v3 to v6 — same shape, just adds new fields
+        // as null. Reads any older drops and brings them forward.
+        const v3 = localStorage.getItem('hbar-ink-drops-v3')
+        if (v3) {
+          try {
+            const parsed = JSON.parse(v3)
+            if (Array.isArray(parsed)) {
+              const upgraded = parsed.map(d => ({
+                kind: null, pinned: false, ...d,
+              }))
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded))
+              return upgraded
+            }
+          } catch {}
+        }
+        return []
+      }
       const parsed = JSON.parse(raw)
       return Array.isArray(parsed) ? parsed : []
     } catch {
@@ -49,7 +72,7 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(drops))
   }
 
-  function addDrop(text, destination) {
+  function addDrop(text, destination, kind) {
     const trimmed = (text || '').trim()
     if (!trimmed) return null
     const drop = {
@@ -58,8 +81,10 @@
         : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       text: trimmed,
       destination: (destination || '').trim() || null,
+      kind: kind || null,
       ts: new Date().toISOString(),
-      brainId: null,  // set when brain memory.write succeeds
+      brainId: null,
+      pinned: false,
     }
     const all = readDrops()
     all.unshift(drop)
@@ -79,12 +104,49 @@
     writeDrops(readDrops().filter(d => d.id !== id))
   }
 
-  function isToday(iso) {
-    const d = new Date(iso)
-    const now = new Date()
+  function togglePin(id) {
+    const all = readDrops()
+    const idx = all.findIndex(d => d.id === id)
+    if (idx < 0) return
+    all[idx].pinned = !all[idx].pinned
+    writeDrops(all)
+  }
+
+  // ---------- counters / streak ----------
+  function isSameDay(d, now) {
     return d.getFullYear() === now.getFullYear()
       && d.getMonth() === now.getMonth()
       && d.getDate() === now.getDate()
+  }
+
+  function computeCounter(drops) {
+    const now = new Date()
+    const todayCount = drops.filter(d => isSameDay(new Date(d.ts), now)).length
+
+    // Streak: count consecutive days (going backward from today) with at
+    // least one drop. If there are zero drops today, streak = 0.
+    if (todayCount === 0) return { todayCount, streak: 0 }
+    const dayKeys = new Set(drops.map(d => {
+      const dd = new Date(d.ts)
+      return `${dd.getFullYear()}-${dd.getMonth()}-${dd.getDate()}`
+    }))
+    let streak = 0
+    const cur = new Date(now)
+    while (true) {
+      const key = `${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`
+      if (!dayKeys.has(key)) break
+      streak++
+      cur.setDate(cur.getDate() - 1)
+    }
+    return { todayCount, streak }
+  }
+
+  function renderCounter() {
+    const { todayCount, streak } = computeCounter(readDrops())
+    els.counter.textContent =
+      streak > 1
+        ? `${todayCount} today · ${streak} day streak`
+        : `${todayCount} today`
   }
 
   // ---------- render ----------
@@ -97,16 +159,10 @@
       : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
-  function renderCounters() {
-    const drops = readDrops()
-    const today = drops.filter(d => isToday(d.ts)).length
-    els.today.textContent = `${today} today`
-  }
-
   function renderDrops() {
     const drops = readDrops()
     els.drops.innerHTML = ''
-    renderCounters()
+    renderCounter()
 
     if (drops.length === 0) {
       const empty = document.createElement('li')
@@ -119,8 +175,14 @@
       return
     }
 
-    drops.slice(0, RECENT_LIMIT).forEach(d => {
+    // Pinned first, then chronological among non-pinned.
+    const pinned = drops.filter(d => d.pinned)
+    const rest = drops.filter(d => !d.pinned)
+    const ordered = [...pinned, ...rest]
+
+    ordered.slice(0, RECENT_LIMIT).forEach(d => {
       const li = document.createElement('li')
+      if (d.pinned) li.className = 'pinned'
 
       const text = document.createElement('div')
       text.className = 'drop-text'
@@ -132,6 +194,13 @@
       const time = document.createElement('span')
       time.textContent = fmtTime(d.ts)
       meta.appendChild(time)
+
+      if (d.kind) {
+        const kindEl = document.createElement('span')
+        kindEl.className = 'drop-kind'
+        kindEl.textContent = `· ${d.kind}`
+        meta.appendChild(kindEl)
+      }
 
       const dest = document.createElement('span')
       if (d.destination) {
@@ -147,6 +216,16 @@
       brainStatus.className = d.brainId ? 'drop-brain saved' : 'drop-brain pending'
       brainStatus.textContent = d.brainId ? 'in brain' : 'local only'
       meta.appendChild(brainStatus)
+
+      const pin = document.createElement('button')
+      pin.className = d.pinned ? 'drop-pin pinned' : 'drop-pin'
+      pin.textContent = d.pinned ? 'unpin' : 'pin'
+      pin.addEventListener('click', () => {
+        togglePin(d.id)
+        renderDrops()
+      })
+      pin.style.marginLeft = 'auto'
+      meta.appendChild(pin)
 
       const del = document.createElement('button')
       del.textContent = 'delete'
@@ -208,21 +287,18 @@
   async function commit() {
     const text = els.input.value
     const destination = els.destination.value
-    const drop = addDrop(text, destination)
+    const kind = currentKind
+    const drop = addDrop(text, destination, kind)
     if (!drop) {
       els.status.textContent = ''
       return
     }
     els.input.value = ''
-    // Keep destination so user can drop multiple thoughts to same dest
+    // Keep destination + kind so user can drop multiple of the same shape
     els.status.textContent = 'sealed → brain…'
     renderDrops()
     els.input.focus()
 
-    // Append to brain episodic memory via bridge. Local copy already saved
-    // above; brain write is best-effort — if it fails, the drop stays
-    // local-only (visible as "local only" in the meta strip) and the user
-    // can retry by dropping it again.
     try {
       const reply = await callBridge('memory.write', {
         layer: 'episodic',
@@ -231,6 +307,7 @@
         metadata: {
           drop_id: drop.id,
           destination: drop.destination,
+          kind: drop.kind,
           ts: drop.ts,
         },
       }, 5000)
@@ -248,8 +325,6 @@
     renderDrops()
   }
 
-  // Click is the primary affordance — universal across keyboards. The
-  // modifier-Enter keyboard shortcut stays as a hidden power-user thing.
   els.dropBtn.addEventListener('click', () => commit())
   els.input.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -267,6 +342,29 @@
       commit()
     }
   })
+
+  // ---------- presets ----------
+  function bootPresets() {
+    document.querySelectorAll('.preset[data-dest]').forEach(b => {
+      b.addEventListener('click', () => {
+        els.destination.value = b.dataset.dest
+        els.input.focus()
+      })
+    })
+    document.querySelectorAll('.preset[data-kind]').forEach(b => {
+      b.addEventListener('click', () => {
+        if (currentKind === b.dataset.kind) {
+          currentKind = null
+          b.classList.remove('active')
+        } else {
+          currentKind = b.dataset.kind
+          document.querySelectorAll('.preset[data-kind]').forEach(other => {
+            other.classList.toggle('active', other === b)
+          })
+        }
+      })
+    })
+  }
 
   // ---------- theme + size pickers ----------
   function applyTheme(themeClass) {
@@ -309,6 +407,30 @@
     applySize(size)
   }
 
+  // ---------- focus mode ----------
+  function applyFocus(on) {
+    document.body.classList.toggle('focus-on', on)
+    els.focusToggle.classList.toggle('active', on)
+    try { localStorage.setItem(FOCUS_KEY, on ? '1' : '0') } catch {}
+    if (on) els.input.focus()
+  }
+
+  els.focusToggle.addEventListener('click', () => {
+    applyFocus(!document.body.classList.contains('focus-on'))
+  })
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('focus-on')) {
+      applyFocus(false)
+    }
+  })
+
+  function bootFocus() {
+    let on = false
+    try { on = localStorage.getItem(FOCUS_KEY) === '1' } catch {}
+    applyFocus(on)
+  }
+
   // ---------- info panel ----------
   function setInfoOpen(open) {
     if (open) {
@@ -324,8 +446,6 @@
   })
 
   function bootInfo() {
-    // Show info panel automatically on first visit ever — once dismissed,
-    // it stays closed unless the user clicks ? again.
     let seen = false
     try { seen = localStorage.getItem(INFO_KEY) === '1' } catch {}
     if (!seen && readDrops().length === 0) setInfoOpen(true)
@@ -333,7 +453,9 @@
 
   // ---------- boot ----------
   bootPickers()
+  bootFocus()
   bootInfo()
+  bootPresets()
   renderDrops()
   loadHeaderMeta()
 })()

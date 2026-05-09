@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.5.0">
+  <link rel="stylesheet" href="./styles.css?v=0.6.0">
 </head>
 <body class="t-writers-room s-m">
   <header class="ink-header">
@@ -32,8 +32,9 @@
             <button data-size="s-l" title="large">L</button>
           </div>
         </div>
+        <button class="ink-focus" id="focus-toggle" title="focus mode (esc to exit)">focus</button>
         <button class="ink-info" id="info-toggle" title="what is this?">?</button>
-        <span id="count-today" class="ink-counter">0 today</span>
+        <span id="counter" class="ink-counter">0 today</span>
         <span id="bf-meta" class="ink-bf"></span>
       </div>
     </div>
@@ -65,6 +66,22 @@
         <span id="status" class="ink-status"></span>
         <button id="drop-btn" class="ink-drop-btn" type="button">drop</button>
       </div>
+      <div class="ink-presets" id="presets">
+        <span class="preset-label">to:</span>
+        <button class="preset" data-dest="hbar.brain/episodic/">brain/ep</button>
+        <button class="preset" data-dest="hbar.brain/semantic/">brain/sem</button>
+        <button class="preset" data-dest="hbar.psychology/">psychology</button>
+        <button class="preset" data-dest="hbar.work/">work</button>
+        <button class="preset" data-dest="hbar.science/">science</button>
+        <button class="preset" data-dest="hbar.systems/">systems</button>
+        <span class="preset-sep">·</span>
+        <span class="preset-label">kind:</span>
+        <button class="preset preset-kind" data-kind="note">note</button>
+        <button class="preset preset-kind" data-kind="essay">essay</button>
+        <button class="preset preset-kind" data-kind="plan">plan</button>
+        <button class="preset preset-kind" data-kind="log">log</button>
+        <button class="preset preset-kind" data-kind="prompt">prompt</button>
+      </div>
     </section>
 
     <section class="ink-section ink-drops" aria-label="recent drops">
@@ -72,6 +89,6 @@
     </section>
   </main>
 
-  <script src="./main.js?v=0.5.0"></script>
+  <script src="./main.js?v=0.6.0"></script>
 </body>
 </html>
