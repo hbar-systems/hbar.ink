@@ -10,7 +10,7 @@
 dialect: brain-app/v1
 id: hbar-ink
 name: hbar.ink
-version: 0.2.0
+version: 0.3.0
 description: Single-user thought-drop instrument. One job — absorb compressed thoughts fast.
 license: AGPL-3.0
 
@@ -29,20 +29,15 @@ tab:
 entries:
   ui_bundle: brain-app-dist/
 
-# v0 ships with NO permissions — drops are localStorage-only inside the
-# iframe. The brain-memory.write integration is the next ship; when it
-# lands, the manifest gains:
-#
-#   permissions:
-#     - memory.write
-#   requires_layers:
-#     - layer: episodic
-#       mode: append
-#   requires_endpoints:
-#     - POST /memory/append
-#
-# Until then, the manifest is intentionally permission-free so the install
-# approval screen is honest about what the app actually does.
+permissions:
+  - memory.write
+
+requires_layers:
+  - layer: episodic
+    mode: append
+
+requires_endpoints:
+  - POST /memory/append
 
 engines:
-  brainfoundry-nous: ">=0.6.0"
+  brainfoundry-nous: ">=0.7.0"

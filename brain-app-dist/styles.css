@@ -199,6 +199,19 @@ html, body {
   font-style: italic;
 }
 
+.drop-brain {
+  color: #9ca3af;
+}
+
+.drop-brain.saved {
+  color: #6b7280;
+}
+
+.drop-brain.pending {
+  color: #c0bdb5;
+  font-style: italic;
+}
+
 .drop-meta button {
   background: transparent;
   border: none;

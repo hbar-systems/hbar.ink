@@ -1,22 +1,21 @@
-// hbar.ink — brain-app v0.2.
+// hbar.ink — brain-app v0.3.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
-// destination, ts }. Storage is localStorage in v0.2; the
-// brain.memory.write integration ships v0.3 — that's when the
-// `destination` field starts actually routing thoughts into the
-// brain's RAG layer.
+// destination, ts, brainId? }. Storage is localStorage (immediate UI)
+// AND the brain's episodic memory layer via the bridge memory.write
+// intent. brainId is set when the brain accepts the write.
 //
-// Bridge usage (v0.2):
+// Bridge usage (v0.3):
 //   meta.app_info  — header version display
 //   meta.brain_info — header brain-name display
-//
-// Roadmap intents (NOT YET wired):
-//   memory.write   — { layer, content, source, destination }
+//   memory.write   — append the drop into the brain's episodic layer.
+//                    payload: { layer, content, source, metadata }
+//                    success: result.id is the brain-side memory id.
 
 (() => {
   'use strict'
 
-  const STORAGE_KEY = 'hbar-ink-drops-v2'
+  const STORAGE_KEY = 'hbar-ink-drops-v3'
   const RECENT_LIMIT = 20
 
   const els = {
@@ -54,11 +53,20 @@
       text: trimmed,
       destination: (destination || '').trim() || null,
       ts: new Date().toISOString(),
+      brainId: null,  // set when brain memory.write succeeds
     }
     const all = readDrops()
     all.unshift(drop)
     writeDrops(all)
     return drop
+  }
+
+  function markDropSavedToBrain(id, brainId) {
+    const all = readDrops()
+    const idx = all.findIndex(d => d.id === id)
+    if (idx < 0) return
+    all[idx].brainId = brainId
+    writeDrops(all)
   }
 
   function deleteDrop(id) {
@@ -126,6 +134,11 @@
       }
       meta.appendChild(dest)
 
+      const brainStatus = document.createElement('span')
+      brainStatus.className = d.brainId ? 'drop-brain saved' : 'drop-brain pending'
+      brainStatus.textContent = d.brainId ? 'in brain' : 'local only'
+      meta.appendChild(brainStatus)
+
       const del = document.createElement('button')
       del.textContent = 'delete'
       del.addEventListener('click', () => {
@@ -183,7 +196,7 @@
   }
 
   // ---------- input handling ----------
-  function commit() {
+  async function commit() {
     const text = els.input.value
     const destination = els.destination.value
     const drop = addDrop(text, destination)
@@ -193,10 +206,37 @@
     }
     els.input.value = ''
     // Keep destination so user can drop multiple thoughts to same dest
-    els.status.textContent = 'sealed'
-    setTimeout(() => { els.status.textContent = '' }, 1200)
+    els.status.textContent = 'sealed → brain…'
     renderDrops()
     els.input.focus()
+
+    // Append to brain episodic memory via bridge. Local copy already saved
+    // above; brain write is best-effort — if it fails, the drop stays
+    // local-only (visible as "local only" in the meta strip) and the user
+    // can retry by dropping it again.
+    try {
+      const reply = await callBridge('memory.write', {
+        layer: 'episodic',
+        content: drop.text,
+        source: 'hbar-ink',
+        metadata: {
+          drop_id: drop.id,
+          destination: drop.destination,
+          ts: drop.ts,
+        },
+      }, 5000)
+      if (reply.ok && reply.result && reply.result.id) {
+        markDropSavedToBrain(drop.id, reply.result.id)
+        els.status.textContent = 'in brain'
+      } else {
+        const code = (reply.error && reply.error.code) || 'memory_write_failed'
+        els.status.textContent = `local only (${code})`
+      }
+    } catch (e) {
+      els.status.textContent = 'local only (offline)'
+    }
+    setTimeout(() => { els.status.textContent = '' }, 2000)
+    renderDrops()
   }
 
   els.input.addEventListener('keydown', (e) => {
