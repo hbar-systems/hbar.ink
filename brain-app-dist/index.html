@@ -6,10 +6,10 @@
   <title>hbar.ink</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.6.0">
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=0.7.0">
 </head>
-<body class="t-writers-room s-m">
+<body class="t-writers-room s-m f-serif">
   <header class="ink-header">
     <div class="ink-row">
       <div class="ink-brand-block">
@@ -25,6 +25,11 @@
             <button data-theme="t-writers-room" title="Writer's Room">W</button>
             <button data-theme="t-night-ink" title="Night Ink">N</button>
             <button data-theme="t-academia" title="Academia">A</button>
+          </div>
+          <div class="ink-picker" role="group" aria-label="font family">
+            <button data-font="f-serif" title="Spectral (serif)">Aa</button>
+            <button data-font="f-sans" title="Inter (sans)">aA</button>
+            <button data-font="f-mono" title="DM Mono">{}</button>
           </div>
           <div class="ink-picker" role="group" aria-label="font size">
             <button data-size="s-s" title="small">S</button>
@@ -81,7 +86,21 @@
         <button class="preset preset-kind" data-kind="plan">plan</button>
         <button class="preset preset-kind" data-kind="log">log</button>
         <button class="preset preset-kind" data-kind="prompt">prompt</button>
+        <span class="preset-sep">·</span>
+        <span class="preset-label">ai:</span>
+        <button class="preset preset-ai" id="ai-policy-btn" data-policy="allow" title="how the brain may use this drop in chat RAG">allow</button>
       </div>
+    </section>
+
+    <section class="ink-section ink-search-row" aria-label="filter drops">
+      <input
+        id="search"
+        type="text"
+        placeholder="search drops…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <span id="search-count" class="ink-search-count"></span>
     </section>
 
     <section class="ink-section ink-drops" aria-label="recent drops">
@@ -89,6 +108,20 @@
     </section>
   </main>
 
-  <script src="./main.js?v=0.6.0"></script>
+  <footer class="ink-footer">
+    <div class="ink-footer-row">
+      <div class="ink-tools">
+        <span class="ink-tools-label">tools</span>
+        <button id="export-md" class="ink-tool-btn" title="download all drops as a single markdown file">export .md</button>
+      </div>
+      <div class="ink-stats" id="stats">—</div>
+    </div>
+    <div class="ink-footer-row">
+      <span class="ink-footer-faint">drops are yours. local browser + your brain. no third party.</span>
+      <a class="ink-footer-link" href="https://hbar.systems" target="_blank" rel="noopener noreferrer">part of hbar.systems</a>
+    </div>
+  </footer>
+
+  <script src="./main.js?v=0.7.0"></script>
 </body>
 </html>

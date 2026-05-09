@@ -51,6 +51,10 @@ body.s-s { --size-base: 17px; --size-drop: 14px; }
 body.s-m { --size-base: 19px; --size-drop: 16px; }
 body.s-l { --size-base: 22px; --size-drop: 18px; }
 
+body.f-serif { --serif: 'Spectral', Georgia, 'Times New Roman', serif; }
+body.f-sans  { --serif: 'Inter', system-ui, -apple-system, sans-serif; }
+body.f-mono  { --serif: 'DM Mono', ui-monospace, 'JetBrains Mono', monospace; }
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -422,7 +426,9 @@ body.focus-on .ink-counter,
 body.focus-on .ink-bf,
 body.focus-on .ink-info-panel,
 body.focus-on .ink-presets,
-body.focus-on .ink-drops {
+body.focus-on .ink-search-row,
+body.focus-on .ink-drops,
+body.focus-on .ink-footer {
   display: none;
 }
 
@@ -432,3 +438,148 @@ body.focus-on .ink-row { align-items: center; }
 body.focus-on #drop-input {
   min-height: 60vh;
 }
+
+/* ---------- search row ---------- */
+.ink-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 24px;
+}
+#search {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  outline: none;
+  padding: 6px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-soft);
+  letter-spacing: 0.02em;
+}
+#search::placeholder { color: var(--whisper); font-style: italic; }
+#search:focus { border-bottom-color: var(--accent); }
+.ink-search-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ---------- AI policy preset (cycle) ---------- */
+.preset-ai {
+  min-width: 70px;
+  text-align: center;
+}
+.preset-ai[data-policy="allow"] { color: var(--muted); }
+.preset-ai[data-policy="allow_rag_only"] { color: var(--accent); border-color: var(--accent); }
+.preset-ai[data-policy="deny"] { color: var(--whisper); border-style: dashed; }
+
+/* ---------- sealed drops ---------- */
+.ink-list li.sealed {
+  border-color: var(--accent);
+  border-top-width: 1px;
+  background: var(--surface);
+  padding-left: 14px;
+  padding-right: 14px;
+  border-radius: 4px;
+}
+.ink-list li.sealed .drop-text { color: var(--text); }
+.drop-sealed-badge {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.drop-seal {
+  background: transparent;
+  border: none;
+  color: var(--faint);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 0 4px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+.drop-seal:hover { color: var(--accent); }
+.drop-seal.sealed { color: var(--accent); }
+
+.drop-ai {
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
+.drop-ai.allow_rag_only { color: var(--accent); }
+.drop-ai.deny { color: var(--whisper); font-style: italic; }
+
+/* ---------- footer ---------- */
+.ink-footer {
+  background: var(--bg);
+  border-top: 1px solid var(--hairline);
+  padding: 24px 32px 32px;
+  margin-top: 16px;
+}
+.ink-footer-row {
+  max-width: 768px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ink-footer-row + .ink-footer-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.ink-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ink-tools-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.ink-tool-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.ink-tool-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.ink-stats {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+.ink-footer-faint {
+  font-size: 11px;
+  color: var(--faint);
+  font-style: italic;
+}
+.ink-footer-link {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+.ink-footer-link:hover { color: var(--text-soft); }

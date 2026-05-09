@@ -1,26 +1,38 @@
-// hbar.ink — brain-app v0.6.
+// hbar.ink — brain-app v0.7.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
-// destination, kind, ts, brainId?, pinned }. Storage is localStorage
-// (immediate UI) AND the brain's episodic memory layer via the bridge
-// memory.write intent.
+// destination, kind, ts, brainId?, pinned, sealedAt?, aiPolicy }.
+// localStorage (immediate UI) + brain memory.write via the bridge.
 //
-// Bridge usage (v0.6):
-//   meta.app_info  — header version display
-//   meta.brain_info — header brain-name display
-//   memory.write   — append the drop into the brain's episodic layer
-//                    payload: { layer, content, source, metadata }
-//                    success: result.id is the brain-side memory id
+// v0.7 additions:
+//   - sealing ceremony (sealedAt timestamp, visual + delete-confirm)
+//   - per-drop AI policy (allow / allow_rag_only / deny) — gates whether
+//     memory.write is called and is sent as metadata
+//   - search filter (live, client-side substring match)
+//   - export-all to a single .md file
+//   - 3 font families (Spectral / Inter / DM Mono)
+//
+// Bridge usage:
+//   meta.app_info, meta.brain_info, memory.write — same as v0.6.
 
 (() => {
   'use strict'
 
-  const STORAGE_KEY = 'hbar-ink-drops-v6'
+  const STORAGE_KEY = 'hbar-ink-drops-v7'
   const THEME_KEY = 'hbar-ink-theme'
   const SIZE_KEY = 'hbar-ink-size'
+  const FONT_KEY = 'hbar-ink-font'
   const INFO_KEY = 'hbar-ink-info-seen'
   const FOCUS_KEY = 'hbar-ink-focus'
-  const RECENT_LIMIT = 30
+  const POLICY_KEY = 'hbar-ink-default-policy'
+  const RECENT_LIMIT = 50
+
+  const POLICY_CYCLE = ['allow', 'allow_rag_only', 'deny']
+  const POLICY_LABEL = {
+    allow: 'allow',
+    allow_rag_only: 'rag-only',
+    deny: 'deny',
+  }
 
   const els = {
     input: document.getElementById('drop-input'),
@@ -34,30 +46,42 @@
     dropBtn: document.getElementById('drop-btn'),
     presets: document.getElementById('presets'),
     focusToggle: document.getElementById('focus-toggle'),
+    aiPolicyBtn: document.getElementById('ai-policy-btn'),
+    search: document.getElementById('search'),
+    searchCount: document.getElementById('search-count'),
+    exportBtn: document.getElementById('export-md'),
+    stats: document.getElementById('stats'),
   }
 
-  // Track current source-kind picked from the kind preset row (null = unset)
+  // session state
   let currentKind = null
+  let currentPolicy = 'allow'
+  let searchQuery = ''
 
   // ---------- storage ----------
   function readDrops() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) {
-        // One-time migration from v3 to v6 — same shape, just adds new fields
-        // as null. Reads any older drops and brings them forward.
-        const v3 = localStorage.getItem('hbar-ink-drops-v3')
-        if (v3) {
-          try {
-            const parsed = JSON.parse(v3)
-            if (Array.isArray(parsed)) {
-              const upgraded = parsed.map(d => ({
-                kind: null, pinned: false, ...d,
-              }))
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded))
-              return upgraded
-            }
-          } catch {}
+        // One-time migration from v6/v3 — same shape, add new fields.
+        for (const key of ['hbar-ink-drops-v6', 'hbar-ink-drops-v3']) {
+          const old = localStorage.getItem(key)
+          if (old) {
+            try {
+              const parsed = JSON.parse(old)
+              if (Array.isArray(parsed)) {
+                const upgraded = parsed.map(d => ({
+                  kind: null,
+                  pinned: false,
+                  sealedAt: null,
+                  aiPolicy: 'allow',
+                  ...d,
+                }))
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded))
+                return upgraded
+              }
+            } catch {}
+          }
         }
         return []
       }
@@ -72,7 +96,7 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(drops))
   }
 
-  function addDrop(text, destination, kind) {
+  function addDrop(text, destination, kind, aiPolicy) {
     const trimmed = (text || '').trim()
     if (!trimmed) return null
     const drop = {
@@ -85,6 +109,8 @@
       ts: new Date().toISOString(),
       brainId: null,
       pinned: false,
+      sealedAt: null,
+      aiPolicy: aiPolicy || 'allow',
     }
     const all = readDrops()
     all.unshift(drop)
@@ -101,6 +127,10 @@
   }
 
   function deleteDrop(id) {
+    const drop = readDrops().find(d => d.id === id)
+    if (drop && drop.sealedAt) {
+      if (!confirm(`This drop is sealed (${new Date(drop.sealedAt).toLocaleString()}). Delete anyway?`)) return
+    }
     writeDrops(readDrops().filter(d => d.id !== id))
   }
 
@@ -109,6 +139,14 @@
     const idx = all.findIndex(d => d.id === id)
     if (idx < 0) return
     all[idx].pinned = !all[idx].pinned
+    writeDrops(all)
+  }
+
+  function toggleSeal(id) {
+    const all = readDrops()
+    const idx = all.findIndex(d => d.id === id)
+    if (idx < 0) return
+    all[idx].sealedAt = all[idx].sealedAt ? null : new Date().toISOString()
     writeDrops(all)
   }
 
@@ -122,9 +160,6 @@
   function computeCounter(drops) {
     const now = new Date()
     const todayCount = drops.filter(d => isSameDay(new Date(d.ts), now)).length
-
-    // Streak: count consecutive days (going backward from today) with at
-    // least one drop. If there are zero drops today, streak = 0.
     if (todayCount === 0) return { todayCount, streak: 0 }
     const dayKeys = new Set(drops.map(d => {
       const dd = new Date(d.ts)
@@ -149,6 +184,18 @@
         : `${todayCount} today`
   }
 
+  function renderStats() {
+    const all = readDrops()
+    const total = all.length
+    const sealed = all.filter(d => d.sealedAt).length
+    const inBrain = all.filter(d => d.brainId).length
+    const oldest = all.length > 0 ? all[all.length - 1].ts : null
+    const oldestDate = oldest ? new Date(oldest).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
+    els.stats.textContent = total === 0
+      ? '—'
+      : `${total} drops · ${inBrain} in brain · ${sealed} sealed · since ${oldestDate}`
+  }
+
   // ---------- render ----------
   function fmtTime(iso) {
     const d = new Date(iso)
@@ -159,30 +206,55 @@
       : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
+  function matchesSearch(drop) {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (drop.text || '').toLowerCase().includes(q)
+      || (drop.destination || '').toLowerCase().includes(q)
+      || (drop.kind || '').toLowerCase().includes(q)
+  }
+
   function renderDrops() {
-    const drops = readDrops()
+    const allDrops = readDrops()
+    const filtered = allDrops.filter(matchesSearch)
     els.drops.innerHTML = ''
     renderCounter()
+    renderStats()
 
-    if (drops.length === 0) {
+    // search count
+    if (searchQuery) {
+      els.searchCount.textContent = `${filtered.length} of ${allDrops.length}`
+    } else {
+      els.searchCount.textContent = ''
+    }
+
+    if (filtered.length === 0) {
       const empty = document.createElement('li')
       empty.className = 'empty'
-      empty.innerHTML =
-        '<span class="empty-line">no drops yet.</span>' +
-        '<span class="empty-line">type a thought above and hit drop.</span>' +
-        '<span class="empty-line empty-faint">drops route to your brain\'s episodic memory.</span>'
+      if (searchQuery && allDrops.length > 0) {
+        empty.innerHTML =
+          '<span class="empty-line">no matching drops.</span>' +
+          '<span class="empty-line empty-faint">try a different search term, or clear the field.</span>'
+      } else {
+        empty.innerHTML =
+          '<span class="empty-line">no drops yet.</span>' +
+          '<span class="empty-line">type a thought above and hit drop.</span>' +
+          '<span class="empty-line empty-faint">drops route to your brain\'s episodic memory.</span>'
+      }
       els.drops.appendChild(empty)
       return
     }
 
-    // Pinned first, then chronological among non-pinned.
-    const pinned = drops.filter(d => d.pinned)
-    const rest = drops.filter(d => !d.pinned)
+    const pinned = filtered.filter(d => d.pinned)
+    const rest = filtered.filter(d => !d.pinned)
     const ordered = [...pinned, ...rest]
 
     ordered.slice(0, RECENT_LIMIT).forEach(d => {
       const li = document.createElement('li')
-      if (d.pinned) li.className = 'pinned'
+      const classes = []
+      if (d.pinned) classes.push('pinned')
+      if (d.sealedAt) classes.push('sealed')
+      if (classes.length) li.className = classes.join(' ')
 
       const text = document.createElement('div')
       text.className = 'drop-text'
@@ -214,8 +286,32 @@
 
       const brainStatus = document.createElement('span')
       brainStatus.className = d.brainId ? 'drop-brain saved' : 'drop-brain pending'
-      brainStatus.textContent = d.brainId ? 'in brain' : 'local only'
+      brainStatus.textContent = d.brainId ? 'in brain' : (d.aiPolicy === 'deny' ? 'local (no brain)' : 'local only')
       meta.appendChild(brainStatus)
+
+      if (d.aiPolicy && d.aiPolicy !== 'allow') {
+        const ai = document.createElement('span')
+        ai.className = `drop-ai ${d.aiPolicy}`
+        ai.textContent = `· ${POLICY_LABEL[d.aiPolicy] || d.aiPolicy}`
+        meta.appendChild(ai)
+      }
+
+      if (d.sealedAt) {
+        const sb = document.createElement('span')
+        sb.className = 'drop-sealed-badge'
+        sb.textContent = `· sealed ${fmtTime(d.sealedAt)}`
+        meta.appendChild(sb)
+      }
+
+      const seal = document.createElement('button')
+      seal.className = d.sealedAt ? 'drop-seal sealed' : 'drop-seal'
+      seal.textContent = d.sealedAt ? 'unseal' : 'seal'
+      seal.style.marginLeft = 'auto'
+      seal.addEventListener('click', () => {
+        toggleSeal(d.id)
+        renderDrops()
+      })
+      meta.appendChild(seal)
 
       const pin = document.createElement('button')
       pin.className = d.pinned ? 'drop-pin pinned' : 'drop-pin'
@@ -224,7 +320,6 @@
         togglePin(d.id)
         renderDrops()
       })
-      pin.style.marginLeft = 'auto'
       meta.appendChild(pin)
 
       const del = document.createElement('button')
@@ -278,9 +373,7 @@
       if (appReply.ok && brainReply.ok) {
         els.bfMeta.textContent = `v${appReply.result.version} · ${brainReply.result.name}`
       }
-    } catch {
-      // standalone-load (no parent host): leave the meta line empty.
-    }
+    } catch {}
   }
 
   // ---------- input handling ----------
@@ -288,17 +381,22 @@
     const text = els.input.value
     const destination = els.destination.value
     const kind = currentKind
-    const drop = addDrop(text, destination, kind)
+    const drop = addDrop(text, destination, kind, currentPolicy)
     if (!drop) {
       els.status.textContent = ''
       return
     }
     els.input.value = ''
-    // Keep destination + kind so user can drop multiple of the same shape
-    els.status.textContent = 'sealed → brain…'
     renderDrops()
     els.input.focus()
 
+    if (drop.aiPolicy === 'deny') {
+      els.status.textContent = 'sealed (local — no brain)'
+      setTimeout(() => { els.status.textContent = '' }, 2000)
+      return
+    }
+
+    els.status.textContent = 'sealed → brain…'
     try {
       const reply = await callBridge('memory.write', {
         layer: 'episodic',
@@ -308,6 +406,7 @@
           drop_id: drop.id,
           destination: drop.destination,
           kind: drop.kind,
+          ai_policy: drop.aiPolicy,
           ts: drop.ts,
         },
       }, 5000)
@@ -318,7 +417,7 @@
         const code = (reply.error && reply.error.code) || 'memory_write_failed'
         els.status.textContent = `local only (${code})`
       }
-    } catch (e) {
+    } catch {
       els.status.textContent = 'local only (offline)'
     }
     setTimeout(() => { els.status.textContent = '' }, 2000)
@@ -364,9 +463,92 @@
         }
       })
     })
+
+    // AI policy cycle
+    function applyPolicy(p) {
+      currentPolicy = p
+      els.aiPolicyBtn.dataset.policy = p
+      els.aiPolicyBtn.textContent = POLICY_LABEL[p] || p
+      try { localStorage.setItem(POLICY_KEY, p) } catch {}
+    }
+    els.aiPolicyBtn.addEventListener('click', () => {
+      const i = POLICY_CYCLE.indexOf(currentPolicy)
+      const next = POLICY_CYCLE[(i + 1) % POLICY_CYCLE.length]
+      applyPolicy(next)
+    })
+    let saved = 'allow'
+    try {
+      const v = localStorage.getItem(POLICY_KEY)
+      if (POLICY_CYCLE.includes(v)) saved = v
+    } catch {}
+    applyPolicy(saved)
   }
 
-  // ---------- theme + size pickers ----------
+  // ---------- search ----------
+  function bootSearch() {
+    els.search.addEventListener('input', () => {
+      searchQuery = els.search.value.trim()
+      renderDrops()
+    })
+    els.search.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        els.search.value = ''
+        searchQuery = ''
+        renderDrops()
+        els.search.blur()
+      }
+    })
+  }
+
+  // ---------- export ----------
+  function exportMd() {
+    const drops = readDrops()
+    if (drops.length === 0) {
+      alert('nothing to export — drop a thought first.')
+      return
+    }
+    const lines = []
+    const now = new Date().toISOString()
+    lines.push('# hbar.ink — drops export')
+    lines.push('')
+    lines.push(`generated ${now}`)
+    lines.push(`${drops.length} drops total`)
+    lines.push('')
+    lines.push('---')
+    lines.push('')
+    drops.forEach(d => {
+      lines.push(`## ${new Date(d.ts).toLocaleString()}`)
+      const meta = []
+      if (d.destination) meta.push(`to: ${d.destination}`)
+      if (d.kind) meta.push(`kind: ${d.kind}`)
+      if (d.aiPolicy && d.aiPolicy !== 'allow') meta.push(`ai: ${d.aiPolicy}`)
+      if (d.sealedAt) meta.push(`sealed: ${new Date(d.sealedAt).toLocaleString()}`)
+      if (d.pinned) meta.push('pinned')
+      if (meta.length) {
+        lines.push('')
+        lines.push(`*${meta.join(' · ')}*`)
+      }
+      lines.push('')
+      lines.push(d.text)
+      lines.push('')
+      lines.push('---')
+      lines.push('')
+    })
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const stamp = new Date().toISOString().slice(0, 10)
+    a.download = `hbar-ink-drops-${stamp}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  els.exportBtn.addEventListener('click', exportMd)
+
+  // ---------- theme + size + font pickers ----------
   function applyTheme(themeClass) {
     const all = ['t-writers-room', 't-night-ink', 't-academia']
     document.body.classList.remove(...all)
@@ -376,7 +558,6 @@
     })
     try { localStorage.setItem(THEME_KEY, themeClass) } catch {}
   }
-
   function applySize(sizeClass) {
     const all = ['s-s', 's-m', 's-l']
     document.body.classList.remove(...all)
@@ -386,6 +567,15 @@
     })
     try { localStorage.setItem(SIZE_KEY, sizeClass) } catch {}
   }
+  function applyFont(fontClass) {
+    const all = ['f-serif', 'f-sans', 'f-mono']
+    document.body.classList.remove(...all)
+    document.body.classList.add(fontClass)
+    document.querySelectorAll('.ink-picker [data-font]').forEach(b => {
+      b.classList.toggle('active', b.dataset.font === fontClass)
+    })
+    try { localStorage.setItem(FONT_KEY, fontClass) } catch {}
+  }
 
   document.querySelectorAll('.ink-picker [data-theme]').forEach(b => {
     b.addEventListener('click', () => applyTheme(b.dataset.theme))
@@ -393,18 +583,25 @@
   document.querySelectorAll('.ink-picker [data-size]').forEach(b => {
     b.addEventListener('click', () => applySize(b.dataset.size))
   })
+  document.querySelectorAll('.ink-picker [data-font]').forEach(b => {
+    b.addEventListener('click', () => applyFont(b.dataset.font))
+  })
 
   function bootPickers() {
     let theme = 't-writers-room'
     let size = 's-m'
+    let font = 'f-serif'
     try {
       const t = localStorage.getItem(THEME_KEY)
       if (t === 't-writers-room' || t === 't-night-ink' || t === 't-academia') theme = t
       const s = localStorage.getItem(SIZE_KEY)
       if (s === 's-s' || s === 's-m' || s === 's-l') size = s
+      const f = localStorage.getItem(FONT_KEY)
+      if (f === 'f-serif' || f === 'f-sans' || f === 'f-mono') font = f
     } catch {}
     applyTheme(theme)
     applySize(size)
+    applyFont(font)
   }
 
   // ---------- focus mode ----------
@@ -414,17 +611,14 @@
     try { localStorage.setItem(FOCUS_KEY, on ? '1' : '0') } catch {}
     if (on) els.input.focus()
   }
-
   els.focusToggle.addEventListener('click', () => {
     applyFocus(!document.body.classList.contains('focus-on'))
   })
-
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.body.classList.contains('focus-on')) {
       applyFocus(false)
     }
   })
-
   function bootFocus() {
     let on = false
     try { on = localStorage.getItem(FOCUS_KEY) === '1' } catch {}
@@ -440,11 +634,9 @@
       els.infoPanel.setAttribute('hidden', '')
     }
   }
-
   els.infoToggle.addEventListener('click', () => {
     setInfoOpen(els.infoPanel.hasAttribute('hidden'))
   })
-
   function bootInfo() {
     let seen = false
     try { seen = localStorage.getItem(INFO_KEY) === '1' } catch {}
@@ -456,6 +648,7 @@
   bootFocus()
   bootInfo()
   bootPresets()
+  bootSearch()
   renderDrops()
   loadHeaderMeta()
 })()
