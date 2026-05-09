@@ -6,7 +6,7 @@
   <title>hbar.ink</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@300;400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -16,25 +16,36 @@
         <span class="ink-glyph">ℏ</span>
         <span class="ink-name">hbar.ink</span>
       </div>
-      <div class="ink-meta" id="bf-meta"></div>
+      <div class="ink-meta">
+        <span id="count-today" class="ink-counter">0 today</span>
+        <span id="bf-meta" class="ink-bf"></span>
+      </div>
     </div>
   </header>
 
   <main class="ink-main">
-    <section class="ink-section">
+    <section class="ink-section ink-instrument">
       <textarea
         id="drop-input"
-        placeholder="Drop a thought."
+        placeholder="a thought."
         autofocus
         spellcheck="false"
+        rows="6"
       ></textarea>
-      <div class="ink-hint">
-        <span id="status"></span>
+      <div class="ink-instrument-row">
+        <input
+          id="destination"
+          type="text"
+          placeholder="to: hbar.brain/episodic/  (optional)"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <span id="status" class="ink-status"></span>
         <span class="ink-hint-key">⌘↵ to drop</span>
       </div>
     </section>
 
-    <section class="ink-section ink-drops" aria-label="Recent drops">
+    <section class="ink-section ink-drops" aria-label="recent drops">
       <ul id="drops" class="ink-list"></ul>
     </section>
   </main>

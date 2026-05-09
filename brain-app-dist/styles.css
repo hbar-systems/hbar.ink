@@ -1,7 +1,7 @@
-/* hbar.ink — Writer's Room style.
- * Mirrors the public hbar.ink site: cream paper, Spectral serif, gray hierarchy.
- * Lives inside an iframe in the brain UI; the host's dark nav surrounds it,
- * the iframe is its own quiet writing space.
+/* hbar.ink — brain-app v0.2.
+ * Drop instrument with destination tag, Phase 1 Writer's Room typography.
+ * Lives in an iframe; the brain's dark nav surrounds it; the iframe is
+ * its own quiet writing space.
  */
 
 * { box-sizing: border-box; }
@@ -17,7 +17,6 @@ html, body {
   min-height: 100vh;
 }
 
-/* Hide scrollbars (content still scrolls) — matches the site's posture */
 * {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -26,7 +25,7 @@ html, body {
 
 /* ---------- header ---------- */
 .ink-header {
-  padding: 24px 24px 16px;
+  padding: 24px 24px 12px;
 }
 
 .ink-row {
@@ -55,6 +54,16 @@ html, body {
 }
 
 .ink-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ink-counter {
+  letter-spacing: 0.02em;
+}
+
+.ink-bf {
   font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
   font-size: 11px;
   letter-spacing: 0.02em;
@@ -68,11 +77,7 @@ html, body {
 }
 
 .ink-section {
-  padding: 24px;
-}
-
-.ink-section + .ink-section {
-  padding-top: 8px;
+  padding: 16px 24px;
 }
 
 .ink-section > * {
@@ -82,14 +87,14 @@ html, body {
 }
 
 .ink-drops {
-  padding-bottom: 64px;
+  padding-bottom: 96px;
 }
 
-/* ---------- input ---------- */
+/* ---------- instrument (textarea + destination + hint) ---------- */
 #drop-input {
   display: block;
   width: 100%;
-  min-height: 180px;
+  min-height: 160px;
   background: transparent;
   color: #111827;
   border: none;
@@ -97,8 +102,9 @@ html, body {
   resize: none;
   padding: 8px 0;
   font-family: inherit;
-  font-size: 19px;
-  line-height: 1.6;
+  font-size: 24px;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
   caret-color: #111827;
 }
 
@@ -107,18 +113,46 @@ html, body {
   font-style: italic;
 }
 
-.ink-hint {
+.ink-instrument-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-top: 8px;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #ece9e3;
+  margin-top: 4px;
+}
+
+#destination {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 4px 0;
+  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #4b5563;
+  letter-spacing: 0.01em;
+}
+
+#destination::placeholder {
+  color: #c0bdb5;
+  font-style: italic;
+}
+
+.ink-status {
   font-size: 11px;
   color: #9ca3af;
+  font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  min-width: 40px;
+  text-align: right;
 }
 
 .ink-hint-key {
   letter-spacing: 0.05em;
   font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
 }
 
 /* ---------- drop list ---------- */
@@ -130,7 +164,7 @@ html, body {
 
 .ink-list li {
   border-top: 1px solid #e5e7eb;
-  padding: 16px 0;
+  padding: 18px 0;
 }
 
 .ink-list li:last-child {
@@ -140,19 +174,29 @@ html, body {
 .drop-text {
   color: #1f2937;
   white-space: pre-wrap;
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.65;
 }
 
 .drop-meta {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 11px;
   color: #9ca3af;
   font-family: ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
   letter-spacing: 0.02em;
+  flex-wrap: wrap;
+}
+
+.drop-dest {
+  color: #6b7280;
+}
+
+.drop-dest.empty {
+  color: #c0bdb5;
+  font-style: italic;
 }
 
 .drop-meta button {
@@ -165,18 +209,19 @@ html, body {
   text-decoration: underline;
   text-decoration-style: dotted;
   text-underline-offset: 2px;
+  margin-left: auto;
 }
 
 .drop-meta button:hover {
-  color: #374151;
+  color: #4b5563;
 }
 
 /* ---------- empty state ---------- */
 .empty {
-  font-size: 12px;
+  font-size: 13px;
   color: #9ca3af;
   font-style: italic;
   text-align: center;
-  padding: 32px 0;
+  padding: 48px 0;
   letter-spacing: 0.02em;
 }

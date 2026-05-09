@@ -1,26 +1,31 @@
-// hbar.ink — drop instrument inside a brain iframe.
+// hbar.ink — brain-app v0.2.
 //
-// v0 storage: localStorage key `hbar-ink-drops-v1`. v1 will switch to
-// the brain's memory.write intent through the postMessage bridge.
+// Drop instrument inside a brain iframe. Each drop is { id, text,
+// destination, ts }. Storage is localStorage in v0.2; the
+// brain.memory.write integration ships v0.3 — that's when the
+// `destination` field starts actually routing thoughts into the
+// brain's RAG layer.
 //
-// Bridge usage (v0):
-//   - meta.app_info  — used to display app name+version in the header
-//   - meta.brain_info — used to display "drops on <brain>" in the header
+// Bridge usage (v0.2):
+//   meta.app_info  — header version display
+//   meta.brain_info — header brain-name display
 //
-// Permission-gated intents (memory.write, memory.read) are NOT used in
-// this version. The manifest declares zero permissions to match.
+// Roadmap intents (NOT YET wired):
+//   memory.write   — { layer, content, source, destination }
 
 (() => {
   'use strict'
 
-  const STORAGE_KEY = 'hbar-ink-drops-v1'
-  const RECENT_LIMIT = 12
+  const STORAGE_KEY = 'hbar-ink-drops-v2'
+  const RECENT_LIMIT = 20
 
   const els = {
     input: document.getElementById('drop-input'),
+    destination: document.getElementById('destination'),
     status: document.getElementById('status'),
     drops: document.getElementById('drops'),
-    meta: document.getElementById('bf-meta'),
+    today: document.getElementById('count-today'),
+    bfMeta: document.getElementById('bf-meta'),
   }
 
   // ---------- storage ----------
@@ -39,12 +44,15 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(drops))
   }
 
-  function addDrop(text) {
-    const trimmed = text.trim()
+  function addDrop(text, destination) {
+    const trimmed = (text || '').trim()
     if (!trimmed) return null
     const drop = {
-      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      id: crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       text: trimmed,
+      destination: (destination || '').trim() || null,
       ts: new Date().toISOString(),
     }
     const all = readDrops()
@@ -57,6 +65,14 @@
     writeDrops(readDrops().filter(d => d.id !== id))
   }
 
+  function isToday(iso) {
+    const d = new Date(iso)
+    const now = new Date()
+    return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate()
+  }
+
   // ---------- render ----------
   function fmtTime(iso) {
     const d = new Date(iso)
@@ -67,14 +83,21 @@
       : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
+  function renderCounters() {
+    const drops = readDrops()
+    const today = drops.filter(d => isToday(d.ts)).length
+    els.today.textContent = `${today} today`
+  }
+
   function renderDrops() {
     const drops = readDrops()
     els.drops.innerHTML = ''
+    renderCounters()
 
     if (drops.length === 0) {
       const empty = document.createElement('li')
       empty.className = 'empty'
-      empty.textContent = 'No drops yet.'
+      empty.textContent = 'no drops yet. thoughts land here.'
       els.drops.appendChild(empty)
       return
     }
@@ -88,17 +111,29 @@
 
       const meta = document.createElement('div')
       meta.className = 'drop-meta'
+
       const time = document.createElement('span')
       time.textContent = fmtTime(d.ts)
+      meta.appendChild(time)
+
+      const dest = document.createElement('span')
+      if (d.destination) {
+        dest.className = 'drop-dest'
+        dest.textContent = `→ ${d.destination}`
+      } else {
+        dest.className = 'drop-dest empty'
+        dest.textContent = '→ unrouted'
+      }
+      meta.appendChild(dest)
+
       const del = document.createElement('button')
       del.textContent = 'delete'
       del.addEventListener('click', () => {
         deleteDrop(d.id)
         renderDrops()
       })
-
-      meta.appendChild(time)
       meta.appendChild(del)
+
       li.appendChild(text)
       li.appendChild(meta)
       els.drops.appendChild(li)
@@ -106,8 +141,6 @@
   }
 
   // ---------- bridge ----------
-  // Lightweight request/reply against the host. Each request gets a uuid;
-  // we resolve a Promise when a 'reply' event with the matching id arrives.
   const pending = new Map()
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin) return
@@ -142,28 +175,37 @@
         callBridge('meta.brain_info'),
       ])
       if (appReply.ok && brainReply.ok) {
-        els.meta.textContent = `v${appReply.result.version} · drops on ${brainReply.result.name}`
+        els.bfMeta.textContent = `v${appReply.result.version} · ${brainReply.result.name}`
       }
     } catch {
-      // Standalone-load (no parent host): leave the meta line empty.
+      // standalone-load (no parent host): leave the meta line empty.
     }
   }
 
   // ---------- input handling ----------
   function commit() {
     const text = els.input.value
-    const drop = addDrop(text)
+    const destination = els.destination.value
+    const drop = addDrop(text, destination)
     if (!drop) {
       els.status.textContent = ''
       return
     }
     els.input.value = ''
-    els.status.textContent = `dropped at ${fmtTime(drop.ts)}`
+    // Keep destination so user can drop multiple thoughts to same dest
+    els.status.textContent = 'sealed'
+    setTimeout(() => { els.status.textContent = '' }, 1200)
     renderDrops()
     els.input.focus()
   }
 
   els.input.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault()
+      commit()
+    }
+  })
+  els.destination.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault()
       commit()
