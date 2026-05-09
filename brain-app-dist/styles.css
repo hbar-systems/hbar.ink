@@ -21,7 +21,7 @@
   --size-drop: 16px;
 }
 
-body.t-night-ink {
+html.t-night-ink {
   --bg:        #1a1a1a;
   --surface:   rgba(255,255,255,0.04);
   --text:      #e8e0d5;
@@ -34,7 +34,7 @@ body.t-night-ink {
   --accent:    #c9a96e;
 }
 
-body.t-academia {
+html.t-academia {
   --bg:        #efe9d9;
   --surface:   rgba(255,255,255,0.35);
   --text:      #2a221a;
@@ -47,13 +47,13 @@ body.t-academia {
   --accent:    #7a3a2a;
 }
 
-body.s-s { --size-base: 17px; --size-drop: 14px; }
-body.s-m { --size-base: 19px; --size-drop: 16px; }
-body.s-l { --size-base: 22px; --size-drop: 18px; }
+html.s-s { --size-base: 17px; --size-drop: 14px; }
+html.s-m { --size-base: 19px; --size-drop: 16px; }
+html.s-l { --size-base: 22px; --size-drop: 18px; }
 
-body.f-serif { --serif: 'Spectral', Georgia, 'Times New Roman', serif; }
-body.f-sans  { --serif: 'Inter', system-ui, -apple-system, sans-serif; }
-body.f-mono  { --serif: 'DM Mono', ui-monospace, 'JetBrains Mono', monospace; }
+html.f-serif { --serif: 'Spectral', Georgia, 'Times New Roman', serif; }
+html.f-sans  { --serif: 'Inter', system-ui, -apple-system, sans-serif; }
+html.f-mono  { --serif: 'DM Mono', ui-monospace, 'JetBrains Mono', monospace; }
 
 * { box-sizing: border-box; }
 
@@ -68,6 +68,16 @@ html, body {
   min-height: 100vh;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* Body becomes a flex column so .ink-main fills the viewport and the
+ * footer pins to the bottom — no gap below content where html could
+ * peek through. Defense-in-depth alongside putting theme vars on <html>. */
+body {
+  display: flex;
+  flex-direction: column;
+}
+.ink-main { flex: 1 0 auto; }
+.ink-footer { flex: 0 0 auto; }
 
 * {
   scrollbar-width: none;
@@ -419,23 +429,23 @@ html, body {
 .drop-kind { color: var(--muted); font-style: italic; }
 
 /* ---------- focus mode ---------- */
-body.focus-on .ink-tagline,
-body.focus-on .ink-pickers,
-body.focus-on .ink-info,
-body.focus-on .ink-counter,
-body.focus-on .ink-bf,
-body.focus-on .ink-info-panel,
-body.focus-on .ink-presets,
-body.focus-on .ink-search-row,
-body.focus-on .ink-drops,
-body.focus-on .ink-footer {
+html.focus-on .ink-tagline,
+html.focus-on .ink-pickers,
+html.focus-on .ink-info,
+html.focus-on .ink-counter,
+html.focus-on .ink-bf,
+html.focus-on .ink-info-panel,
+html.focus-on .ink-presets,
+html.focus-on .ink-search-row,
+html.focus-on .ink-drops,
+html.focus-on .ink-footer {
   display: none;
 }
 
-body.focus-on .ink-header { padding-bottom: 4px; }
-body.focus-on .ink-row { align-items: center; }
+html.focus-on .ink-header { padding-bottom: 4px; }
+html.focus-on .ink-row { align-items: center; }
 
-body.focus-on #drop-input {
+html.focus-on #drop-input {
   min-height: 60vh;
 }
 

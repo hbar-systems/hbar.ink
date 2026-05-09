@@ -50,6 +50,7 @@
     search: document.getElementById('search'),
     searchCount: document.getElementById('search-count'),
     exportBtn: document.getElementById('export-md'),
+    exportPdfBtn: document.getElementById('export-pdf'),
     stats: document.getElementById('stats'),
   }
 
@@ -548,11 +549,92 @@
 
   els.exportBtn.addEventListener('click', exportMd)
 
+  // ---------- export pdf (via browser print dialog) ----------
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
+  function exportPdf() {
+    const drops = readDrops()
+    if (drops.length === 0) {
+      alert('nothing to export — drop a thought first.')
+      return
+    }
+    const generated = new Date().toISOString()
+    const inBrain = drops.filter(d => d.brainId).length
+    const sealed = drops.filter(d => d.sealedAt).length
+
+    const dropsHtml = drops.map(d => {
+      const meta = []
+      meta.push(`<span class="m-time">${escapeHtml(new Date(d.ts).toLocaleString())}</span>`)
+      if (d.kind) meta.push(`<span class="m-kind">${escapeHtml(d.kind)}</span>`)
+      if (d.destination) meta.push(`<span class="m-dest">→ ${escapeHtml(d.destination)}</span>`)
+      if (d.aiPolicy && d.aiPolicy !== 'allow') meta.push(`<span class="m-ai">${escapeHtml(d.aiPolicy)}</span>`)
+      if (d.brainId) meta.push(`<span class="m-brain">in brain</span>`)
+      if (d.sealedAt) meta.push(`<span class="m-seal">sealed ${escapeHtml(new Date(d.sealedAt).toLocaleString())}</span>`)
+      if (d.pinned) meta.push(`<span class="m-pin">pinned</span>`)
+      return `<article class="drop">
+        <div class="text">${escapeHtml(d.text).replace(/\n/g, '<br>')}</div>
+        <div class="meta">${meta.join(' · ')}</div>
+      </article>`
+    }).join('\n')
+
+    const html = `<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>hbar.ink — drops export</title>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  @page { margin: 18mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 28px; background: #f6f5f2; color: #111827; font-family: 'Spectral', Georgia, serif; line-height: 1.6; }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 4px; }
+  .lede { color: #6b7280; font-size: 13px; font-style: italic; margin: 0 0 24px; }
+  .stats { font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px; color: #6b7280; margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+  article.drop { padding: 18px 0; border-top: 1px solid #e5e7eb; break-inside: avoid; }
+  article.drop:first-of-type { border-top: none; }
+  .text { font-size: 16px; line-height: 1.7; color: #1f2937; white-space: pre-wrap; margin-bottom: 10px; }
+  .meta { font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px; color: #9ca3af; letter-spacing: 0.02em; }
+  .meta span { margin-right: 4px; }
+  .m-dest { color: #6b7280; }
+  .m-brain { color: #6b7280; }
+  .m-seal { color: #8a6f48; font-style: italic; }
+  .m-pin { color: #8a6f48; }
+  .m-ai { color: #8a6f48; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px; color: #9ca3af; text-align: center; }
+  @media print { body { background: white; } }
+</style>
+</head><body>
+<h1>hbar.ink — drops</h1>
+<p class="lede">a single-user thought-drop instrument.</p>
+<div class="stats">${drops.length} drops · ${inBrain} in brain · ${sealed} sealed · exported ${escapeHtml(generated)}</div>
+${dropsHtml}
+<footer>part of hbar.systems</footer>
+<script>setTimeout(() => window.print(), 400)<\/script>
+</body></html>`
+
+    const w = window.open('', '_blank')
+    if (!w) {
+      alert('popup blocked — allow popups for this page to export PDF.')
+      return
+    }
+    w.document.open()
+    w.document.write(html)
+    w.document.close()
+  }
+
+  els.exportPdfBtn.addEventListener('click', exportPdf)
+
   // ---------- theme + size + font pickers ----------
   function applyTheme(themeClass) {
     const all = ['t-writers-room', 't-night-ink', 't-academia']
-    document.body.classList.remove(...all)
-    document.body.classList.add(themeClass)
+    document.documentElement.classList.remove(...all)
+    document.documentElement.classList.add(themeClass)
     document.querySelectorAll('.ink-picker [data-theme]').forEach(b => {
       b.classList.toggle('active', b.dataset.theme === themeClass)
     })
@@ -560,8 +642,8 @@
   }
   function applySize(sizeClass) {
     const all = ['s-s', 's-m', 's-l']
-    document.body.classList.remove(...all)
-    document.body.classList.add(sizeClass)
+    document.documentElement.classList.remove(...all)
+    document.documentElement.classList.add(sizeClass)
     document.querySelectorAll('.ink-picker [data-size]').forEach(b => {
       b.classList.toggle('active', b.dataset.size === sizeClass)
     })
@@ -569,8 +651,8 @@
   }
   function applyFont(fontClass) {
     const all = ['f-serif', 'f-sans', 'f-mono']
-    document.body.classList.remove(...all)
-    document.body.classList.add(fontClass)
+    document.documentElement.classList.remove(...all)
+    document.documentElement.classList.add(fontClass)
     document.querySelectorAll('.ink-picker [data-font]').forEach(b => {
       b.classList.toggle('active', b.dataset.font === fontClass)
     })
@@ -606,16 +688,16 @@
 
   // ---------- focus mode ----------
   function applyFocus(on) {
-    document.body.classList.toggle('focus-on', on)
+    document.documentElement.classList.toggle('focus-on', on)
     els.focusToggle.classList.toggle('active', on)
     try { localStorage.setItem(FOCUS_KEY, on ? '1' : '0') } catch {}
     if (on) els.input.focus()
   }
   els.focusToggle.addEventListener('click', () => {
-    applyFocus(!document.body.classList.contains('focus-on'))
+    applyFocus(!document.documentElement.classList.contains('focus-on'))
   })
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.body.classList.contains('focus-on')) {
+    if (e.key === 'Escape' && document.documentElement.classList.contains('focus-on')) {
       applyFocus(false)
     }
   })
