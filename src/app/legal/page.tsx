@@ -13,6 +13,7 @@ export default function Legal() {
           <nav className="flex gap-6 text-sm text-gray-600">
             <Link href="/about" className="hover:text-gray-900">About</Link>
             <Link href="/legal" className="text-gray-900">Legal</Link>
+            <Link href="/impressum" className="hover:text-gray-900">Impressum</Link>
           </nav>
         </div>
       </header>
@@ -28,30 +29,27 @@ export default function Legal() {
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">Privacy</h2>
               <p className="leading-relaxed">
-                Your documents are yours. We store them securely using Supabase with row-level security. 
-                We don't read your documents. We don't train AI on your documents. We don't sell your data.
+                Your drops live in your browser's local storage. They are not sent to any server.
+                There are no accounts, no logins, no analytics, no tracking.
               </p>
               <p className="leading-relaxed mt-2">
-                Authentication is handled via Supabase Auth. We only store what's necessary to provide the service.
+                If you clear your browser data, your drops go with it. Copy anything you want to keep.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">Terms</h2>
               <p className="leading-relaxed">
-                hbar.ink is provided as-is. This is Phase 1 — a minimal, stable writing instrument. 
+                hbar.ink is provided as-is. It is an instrument, not a service.
                 Use it to write. Don't use it to harm others or break laws.
-              </p>
-              <p className="leading-relaxed mt-2">
-                We reserve the right to terminate accounts that violate these basic principles.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">Data Ownership</h2>
               <p className="leading-relaxed">
-                You own your content. You can export it anytime as Markdown. 
-                If you delete your account, your data is deleted.
+                You own your content. You can copy any drop out as Markdown at any time.
+                Nothing leaves your browser unless you copy it out yourself.
               </p>
             </section>
 
@@ -68,14 +66,18 @@ export default function Legal() {
           <div>hbar.ink — Phase 1</div>
           <div className="text-gray-400">
             hbar.ink is a project within{' '}
-            <a 
-              href="https://hbar.systems" 
-              target="_blank" 
+            <a
+              href="https://hbar.systems"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-gray-500 hover:text-gray-700 transition-colors"
             >
               hbar.systems
             </a>
+            {' · '}
+            <Link href="/impressum" className="text-gray-500 hover:text-gray-700 transition-colors">
+              Impressum
+            </Link>
           </div>
         </div>
       </footer>

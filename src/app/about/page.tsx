@@ -13,6 +13,7 @@ export default function About() {
           <nav className="flex gap-6 text-sm text-gray-600">
             <Link href="/about" className="text-gray-900">About</Link>
             <Link href="/legal" className="hover:text-gray-900">Legal</Link>
+            <Link href="/impressum" className="hover:text-gray-900">Impressum</Link>
           </nav>
         </div>
       </header>
@@ -55,7 +56,7 @@ export default function About() {
             </div>
             
             <p className="text-sm text-gray-500 pt-2">
-              Built with Next.js, TypeScript, and Supabase.
+              Built with Next.js and TypeScript. Drops live in your browser.
             </p>
           </div>
         </div>
@@ -67,14 +68,18 @@ export default function About() {
           <div>hbar.ink — Phase 1</div>
           <div className="text-gray-400">
             Part of{' '}
-            <a 
-              href="https://hbar.systems" 
-              target="_blank" 
+            <a
+              href="https://hbar.systems"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-gray-500 hover:text-gray-700 transition-colors"
             >
               hbar.systems
             </a>
+            {' · '}
+            <Link href="/impressum" className="text-gray-500 hover:text-gray-700 transition-colors">
+              Impressum
+            </Link>
           </div>
         </div>
       </footer>
