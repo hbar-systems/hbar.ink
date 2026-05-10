@@ -303,7 +303,10 @@ body {
 }
 
 /* ---------- drop list ---------- */
-.ink-list { list-style: none; margin: 0; padding: 0; }
+/* margin: 0 auto so the auto-centering from .ink-section > * isn't killed
+ * by the shorthand. Otherwise the ul sat flush-left and the empty state
+ * looked off-center against the full-width footer. */
+.ink-list { list-style: none; margin: 0 auto; padding: 0; }
 
 .ink-list li {
   border-top: 1px solid var(--border);
