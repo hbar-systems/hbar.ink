@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.7.2">
+  <link rel="stylesheet" href="./styles.css?v=0.7.3">
 </head>
 <body>
   <header class="ink-header">
@@ -92,15 +92,17 @@
       </div>
     </section>
 
-    <section class="ink-section ink-search-row" aria-label="filter drops">
-      <input
-        id="search"
-        type="text"
-        placeholder="search drops…"
-        autocomplete="off"
-        spellcheck="false"
-      />
-      <span id="search-count" class="ink-search-count"></span>
+    <section class="ink-section ink-search-section" aria-label="filter drops">
+      <div class="ink-search-row">
+        <input
+          id="search"
+          type="text"
+          placeholder="search drops…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <span id="search-count" class="ink-search-count"></span>
+      </div>
     </section>
 
     <section class="ink-section ink-drops" aria-label="recent drops">
@@ -123,6 +125,6 @@
     </div>
   </footer>
 
-  <script src="./main.js?v=0.7.2"></script>
+  <script src="./main.js?v=0.7.3"></script>
 </body>
 </html>
