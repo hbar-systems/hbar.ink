@@ -590,9 +590,14 @@ html.focus-on #drop-input {
 }
 .ink-footer-link {
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 10px;
+  color: var(--whisper);
   text-decoration: none;
   letter-spacing: 0.02em;
+  opacity: 0.7;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
-.ink-footer-link:hover { color: var(--text-soft); }
+.ink-footer-link:hover {
+  color: var(--muted);
+  opacity: 1;
+}
