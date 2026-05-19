@@ -903,3 +903,68 @@ html.focus-on #drop-input {
 
 /* keep the symbol layer out of the way in focus mode */
 html.focus-on .ink-palette { display: none; }
+
+/* ---------- export panel (sandbox-safe — no download, no popup) ---------- */
+.ink-export {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.42);
+}
+.ink-export[hidden] { display: none; }
+.ink-export-panel {
+  width: 100%;
+  max-width: 640px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+.ink-export-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.ink-export-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  color: var(--accent);
+}
+.ink-export-text {
+  flex: 1;
+  min-height: 320px;
+  resize: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-soft);
+  outline: none;
+  white-space: pre;
+}
+.ink-export-text:focus { border-color: var(--accent); }
+.ink-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ink-export-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}

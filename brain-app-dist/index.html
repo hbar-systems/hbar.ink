@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=Audiowide&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.9.0">
+  <link rel="stylesheet" href="./styles.css?v=0.9.1">
 </head>
 <body>
   <header class="ink-header">
@@ -166,7 +166,21 @@
   <div id="ink-complete" class="ink-complete" role="listbox" aria-label="symbol completions" hidden></div>
   <div id="ink-symcard" class="ink-symcard"></div>
 
-  <script src="./physics.js?v=0.9.0"></script>
-  <script src="./main.js?v=0.9.0"></script>
+  <div id="ink-export" class="ink-export" hidden>
+    <div class="ink-export-panel">
+      <div class="ink-export-head">
+        <span class="ink-export-title">export — copy this to keep it</span>
+        <button type="button" id="ink-export-close" class="ink-tool-btn">close</button>
+      </div>
+      <textarea id="ink-export-text" class="ink-export-text" readonly spellcheck="false"></textarea>
+      <div class="ink-export-actions">
+        <button type="button" id="ink-export-copy" class="ink-tool-btn">copy</button>
+        <span id="ink-export-note" class="ink-export-note"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="./physics.js?v=0.9.1"></script>
+  <script src="./main.js?v=0.9.1"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// hbar.ink — brain-app v0.9.
+// hbar.ink — brain-app v0.9.1.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
 // destination, kind, ts, brainId?, pinned, sealedAt?, aiWeight, lineFonts? }.
@@ -61,6 +61,11 @@
     exportBtn: document.getElementById('export-md'),
     exportPdfBtn: document.getElementById('export-pdf'),
     stats: document.getElementById('stats'),
+    exportOverlay: document.getElementById('ink-export'),
+    exportText: document.getElementById('ink-export-text'),
+    exportClose: document.getElementById('ink-export-close'),
+    exportCopy: document.getElementById('ink-export-copy'),
+    exportNote: document.getElementById('ink-export-note'),
   }
 
   // session state
@@ -746,12 +751,11 @@
   }
 
   // ---------- export ----------
-  function exportMd() {
+  // The brain runs ink in a sandboxed iframe (allow-scripts allow-same-origin)
+  // — file downloads and popups are blocked there. So export builds the text
+  // and shows it in a copyable panel rather than triggering a download.
+  function buildMarkdown() {
     const drops = readDrops()
-    if (drops.length === 0) {
-      alert('nothing to export — drop a thought first.')
-      return
-    }
     const lines = []
     const now = new Date().toISOString()
     lines.push('# hbar.ink — drops export')
@@ -780,19 +784,48 @@
       lines.push('---')
       lines.push('')
     })
-    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const stamp = new Date().toISOString().slice(0, 10)
-    a.download = `hbar-ink-drops-${stamp}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    return lines.join('\n')
+  }
+
+  function openExport(text, note) {
+    els.exportText.value = text
+    els.exportNote.textContent = note || ''
+    els.exportOverlay.hidden = false
+    els.exportText.focus()
+    els.exportText.select()
+  }
+  function closeExport() {
+    els.exportOverlay.hidden = true
+  }
+  function exportMd() {
+    if (readDrops().length === 0) {
+      alert('nothing to export — drop a thought first.')
+      return
+    }
+    openExport(buildMarkdown(),
+      'select all (⌘A / Ctrl+A) and copy — or hit copy. paste into a .md file to keep it.')
   }
 
   els.exportBtn.addEventListener('click', exportMd)
+  els.exportClose.addEventListener('click', closeExport)
+  els.exportOverlay.addEventListener('click', (e) => {
+    if (e.target === els.exportOverlay) closeExport()
+  })
+  els.exportCopy.addEventListener('click', async () => {
+    els.exportText.focus()
+    els.exportText.select()
+    let ok = false
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(els.exportText.value)
+        ok = true
+      }
+    } catch {}
+    if (!ok) { try { ok = document.execCommand('copy') } catch {} }
+    els.exportNote.textContent = ok
+      ? 'copied to clipboard.'
+      : 'select the text and press ⌘C / Ctrl+C to copy.'
+  })
 
   // ---------- export pdf (via browser print dialog) ----------
   function escapeHtml(s) {
@@ -884,7 +917,10 @@ ${dropsHtml}
 
     const w = window.open('', '_blank')
     if (!w) {
-      alert('popup blocked — allow popups for this page to export PDF.')
+      // sandboxed brain iframe — popups are blocked. Fall back to the
+      // copyable panel with the same content as Markdown.
+      openExport(buildMarkdown(),
+        'PDF needs a popup, which the brain blocks for apps — here is the same content as Markdown. copy it, or use export .md.')
       return
     }
     w.document.open()

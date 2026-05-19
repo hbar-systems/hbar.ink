@@ -10,7 +10,7 @@
 dialect: brain-app/v1
 id: hbar-ink
 name: hbar.ink
-version: 0.9.0
+version: 0.9.1
 description: Single-user thought-drop instrument. One job — absorb compressed thoughts fast. Includes a physicist symbol input layer (Greek, operators, bra-ket, equations).
 license: AGPL-3.0
 
