@@ -1,4 +1,4 @@
-// hbar.ink — brain-app v0.9.1.
+// hbar.ink — brain-app v0.9.2.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
 // destination, kind, ts, brainId?, pinned, sealedAt?, aiWeight, lineFonts? }.
@@ -1362,7 +1362,10 @@ ${dropsHtml}
       complete: document.getElementById('ink-complete'),
       symCard: document.getElementById('ink-symcard'),
     }
-    physEls.greekToggle.addEventListener('click', () => setGreekMode(!greekMode))
+    physEls.greekToggle.addEventListener('click', () => {
+      setGreekMode(!greekMode)
+      els.input.focus() // return focus so Greek-mode keystrokes land in the editor
+    })
     physEls.paletteToggle.addEventListener('click', () => setPaletteOpen(!paletteOpen))
     physEls.paletteLayout.addEventListener('click', (e) => {
       const btn = e.target.closest('button')

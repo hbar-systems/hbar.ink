@@ -198,6 +198,12 @@ body {
   background: var(--surface);
   color: var(--text);
 }
+/* Greek mode is a typing mode — make "on" unmistakable */
+#greek-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
 
 .ink-info-panel {
   max-width: 768px;
