@@ -6,8 +6,8 @@
   <title>hbar.ink</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.7.4">
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=Audiowide&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=0.8.0">
 </head>
 <body>
   <header class="ink-header">
@@ -53,13 +53,16 @@
 
   <main class="ink-main">
     <section class="ink-section ink-instrument">
-      <textarea
+      <div
         id="drop-input"
-        placeholder="a thought."
-        autofocus
+        class="ink-editor"
+        contenteditable="true"
+        role="textbox"
+        aria-multiline="true"
+        aria-label="a thought"
         spellcheck="false"
-        rows="6"
-      ></textarea>
+        data-placeholder="a thought."
+      ></div>
       <div class="ink-instrument-row">
         <input
           id="destination"
@@ -79,6 +82,7 @@
         <button class="preset" data-dest="hbar.work/">work</button>
         <button class="preset" data-dest="hbar.science/">science</button>
         <button class="preset" data-dest="hbar.systems/">systems</button>
+        <button class="preset" data-dest="hbar.social/">social</button>
         <span class="preset-sep">·</span>
         <span class="preset-label">kind:</span>
         <button class="preset preset-kind" data-kind="note">note</button>
@@ -88,7 +92,24 @@
         <button class="preset preset-kind" data-kind="prompt">prompt</button>
         <span class="preset-sep">·</span>
         <span class="preset-label">ai:</span>
-        <button class="preset preset-ai" id="ai-policy-btn" data-policy="allow" title="how the brain may use this drop in chat RAG">allow</button>
+        <input
+          type="range"
+          id="ai-weight"
+          class="ink-ai-slider"
+          min="0"
+          max="100"
+          step="5"
+          value="50"
+          aria-label="how much the brain may lean on this drop"
+          title="how much the brain may lean on this drop in chat — 0% keeps it local only"
+        />
+        <span id="ai-weight-value" class="ink-ai-value">50%</span>
+        <span class="preset-sep">·</span>
+        <span class="preset-label" title="put the cursor in a line, then pick a face — or press Cmd/Ctrl + .">line:</span>
+        <button class="preset preset-line" data-linefont="serif" title="this line in serif">serif</button>
+        <button class="preset preset-line" data-linefont="sans" title="this line in sans">sans</button>
+        <button class="preset preset-line" data-linefont="mono" title="this line in mono">mono</button>
+        <button class="preset preset-line" data-linefont="display" title="this line in display">display</button>
       </div>
     </section>
 
@@ -121,10 +142,13 @@
     </div>
     <div class="ink-footer-row">
       <span class="ink-footer-faint">drops are yours. local browser + your brain. no third party.</span>
-      <a class="ink-footer-link" href="https://hbar.systems" target="_blank" rel="noopener noreferrer">hbar.systems</a>
+      <span class="ink-footer-links">
+        <a class="ink-footer-link" href="https://hbar.social" target="_blank" rel="noopener noreferrer">hbar.social</a>
+        <a class="ink-footer-link" href="https://hbar.systems" target="_blank" rel="noopener noreferrer">hbar.systems</a>
+      </span>
     </div>
   </footer>
 
-  <script src="./main.js?v=0.7.3"></script>
+  <script src="./main.js?v=0.8.0"></script>
 </body>
 </html>

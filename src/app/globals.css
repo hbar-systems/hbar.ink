@@ -365,3 +365,34 @@
 .font-spectral {
   font-family: var(--font-spectral), Georgia, serif !important;
 }
+
+/* ===== hbar.ink line editor ===== */
+/* The drop input is a contenteditable surface — each line is one block, and
+ * a block may carry data-font to render in another face (artistic-writing
+ * angle) without changing the rest of the drop. */
+#ink-editor:focus {
+  outline: none;
+}
+
+/* placeholder — the editor always holds one blank block, so JS toggles
+ * .is-empty rather than relying on :empty. */
+#ink-editor.is-empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* per-line font faces */
+#ink-editor [data-font="serif"] {
+  font-family: var(--font-spectral), Georgia, serif;
+}
+#ink-editor [data-font="sans"] {
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+}
+#ink-editor [data-font="mono"] {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+#ink-editor [data-font="display"] {
+  font-family: var(--font-audiowide), system-ui, sans-serif;
+}

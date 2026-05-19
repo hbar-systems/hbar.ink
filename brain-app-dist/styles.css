@@ -1,6 +1,7 @@
-/* hbar.ink — brain-app v0.4.
+/* hbar.ink — brain-app v0.8.
  * Three themes (Writer's Room / Night Ink / Academia), three font sizes,
  * Phase 1 typography. Lives in an iframe; the brain's nav surrounds it.
+ * v0.8: per-line font faces (artistic-writing angle) — see --face-* below.
  */
 
 :root {
@@ -15,8 +16,14 @@
   --border:    #e5e7eb;
   --hairline:  #ece9e3;
   --accent:    #8a6f48;
-  --serif:     'Spectral', Georgia, 'Times New Roman', serif;
-  --mono:      ui-monospace, 'DM Mono', 'JetBrains Mono', monospace;
+  /* fixed faces — used for per-line font overrides, never reassigned */
+  --face-serif:   'Spectral', Georgia, 'Times New Roman', serif;
+  --face-sans:    'Inter', system-ui, -apple-system, sans-serif;
+  --face-mono:    'DM Mono', ui-monospace, 'JetBrains Mono', monospace;
+  --face-display: 'Audiowide', 'Spectral', system-ui, sans-serif;
+  /* document font — reassigned by the f-serif / f-sans / f-mono picker */
+  --serif:     var(--face-serif);
+  --mono:      var(--face-mono);
   --size-base: 19px;
   --size-drop: 16px;
 }
@@ -51,9 +58,9 @@ html.s-s { --size-base: 17px; --size-drop: 14px; }
 html.s-m { --size-base: 19px; --size-drop: 16px; }
 html.s-l { --size-base: 22px; --size-drop: 18px; }
 
-html.f-serif { --serif: 'Spectral', Georgia, 'Times New Roman', serif; }
-html.f-sans  { --serif: 'Inter', system-ui, -apple-system, sans-serif; }
-html.f-mono  { --serif: 'DM Mono', ui-monospace, 'JetBrains Mono', monospace; }
+html.f-serif { --serif: var(--face-serif); }
+html.f-sans  { --serif: var(--face-sans); }
+html.f-mono  { --serif: var(--face-mono); }
 
 * { box-sizing: border-box; }
 
@@ -218,7 +225,10 @@ body {
 }
 .ink-drops { padding-bottom: 96px; }
 
-/* ---------- instrument (textarea + destination + hint) ---------- */
+/* ---------- instrument (line editor + destination + hint) ---------- */
+/* #drop-input is a contenteditable surface — each line is one block, and a
+ * block may carry data-font to render in another face without touching the
+ * rest of the drop. */
 #drop-input {
   display: block;
   width: 100%;
@@ -227,19 +237,36 @@ body {
   color: var(--text);
   border: none;
   outline: none;
-  resize: none;
   padding: 24px 0 8px;
   font-family: inherit;
   font-size: var(--size-base);
   line-height: 1.55;
   letter-spacing: -0.005em;
   caret-color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-#drop-input::placeholder {
+/* placeholder — the editor is never truly empty (it holds one blank block),
+ * so JS toggles .is-empty rather than relying on :empty. */
+.ink-editor.is-empty::before {
+  content: attr(data-placeholder);
   color: var(--whisper);
   font-style: italic;
+  pointer-events: none;
 }
+
+/* per-line font faces — apply inside the editor and to rendered drops */
+.ink-editor [data-font="serif"],
+.drop-line[data-font="serif"]     { font-family: var(--face-serif); }
+.ink-editor [data-font="sans"],
+.drop-line[data-font="sans"]      { font-family: var(--face-sans); }
+.ink-editor [data-font="mono"],
+.drop-line[data-font="mono"]      { font-family: var(--face-mono); }
+.ink-editor [data-font="display"],
+.drop-line[data-font="display"]   { font-family: var(--face-display); }
+
+.drop-line { white-space: pre-wrap; }
 
 .ink-instrument-row {
   display: flex;
@@ -481,14 +508,52 @@ html.focus-on #drop-input {
   white-space: nowrap;
 }
 
-/* ---------- AI policy preset (cycle) ---------- */
-.preset-ai {
-  min-width: 70px;
-  text-align: center;
+/* ---------- AI-use slider ---------- */
+.ink-ai-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 88px;
+  height: 2px;
+  margin: 0 2px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
 }
-.preset-ai[data-policy="allow"] { color: var(--muted); }
-.preset-ai[data-policy="allow_rag_only"] { color: var(--accent); border-color: var(--accent); }
-.preset-ai[data-policy="deny"] { color: var(--whisper); border-style: dashed; }
+.ink-ai-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  cursor: pointer;
+}
+.ink-ai-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  cursor: pointer;
+}
+.ink-ai-slider:hover::-webkit-slider-thumb { background: var(--text); }
+.ink-ai-slider:hover::-moz-range-thumb { background: var(--text); }
+.ink-ai-value {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  min-width: 32px;
+}
+
+/* ---------- per-line font row ---------- */
+/* each button is rendered in the face it sets — self-describing */
+.preset-line[data-linefont="serif"]   { font-family: var(--face-serif); }
+.preset-line[data-linefont="sans"]    { font-family: var(--face-sans); }
+.preset-line[data-linefont="mono"]    { font-family: var(--face-mono); }
+.preset-line[data-linefont="display"] { font-family: var(--face-display); font-size: 10px; }
 
 /* ---------- sealed drops ---------- */
 .ink-list li.sealed {
@@ -524,9 +589,32 @@ html.focus-on #drop-input {
 .drop-ai {
   font-family: var(--mono);
   letter-spacing: 0.02em;
+  color: var(--accent);
 }
-.drop-ai.allow_rag_only { color: var(--accent); }
 .drop-ai.deny { color: var(--whisper); font-style: italic; }
+
+/* ---------- hbar.social link ---------- */
+.drop-social {
+  background: transparent;
+  border: none;
+  color: var(--faint);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 0 4px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+.drop-social:hover { color: var(--accent); }
+.drop-social.on { color: var(--accent); }
+
+.drop-social-badge {
+  color: var(--accent);
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
 
 /* ---------- footer ---------- */
 .ink-footer {
@@ -587,6 +675,11 @@ html.focus-on #drop-input {
   font-size: 11px;
   color: var(--faint);
   font-style: italic;
+}
+.ink-footer-links {
+  display: flex;
+  gap: 14px;
+  align-items: center;
 }
 .ink-footer-link {
   font-family: var(--mono);

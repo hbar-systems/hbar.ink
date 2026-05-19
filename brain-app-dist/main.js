@@ -1,16 +1,19 @@
-// hbar.ink — brain-app v0.7.
+// hbar.ink — brain-app v0.8.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
-// destination, kind, ts, brainId?, pinned, sealedAt?, aiPolicy }.
+// destination, kind, ts, brainId?, pinned, sealedAt?, aiWeight, lineFonts? }.
 // localStorage (immediate UI) + brain memory.write via the bridge.
 //
-// v0.7 additions:
-//   - sealing ceremony (sealedAt timestamp, visual + delete-confirm)
-//   - per-drop AI policy (allow / allow_rag_only / deny) — gates whether
-//     memory.write is called and is sent as metadata
-//   - search filter (live, client-side substring match)
-//   - export-all to a single .md file
-//   - 3 font families (Spectral / Inter / DM Mono)
+// v0.8 additions (artistic-writing angle):
+//   - per-line font: the drop input is a line editor — each line can carry
+//     its own face (serif / sans / mono / display) without changing the
+//     rest of the drop. Set it from the `line:` row or with Cmd/Ctrl+.
+//   - AI use is now a 0–100% slider (starts at 50%) instead of a 3-state
+//     button. 0% keeps the drop local; >0% writes it to the brain with the
+//     weight as metadata.
+//
+// v0.7 carried forward: sealing ceremony, search filter, export .md/.pdf,
+// document-level font/theme/size pickers.
 //
 // Bridge usage:
 //   meta.app_info, meta.brain_info, memory.write — same as v0.6.
@@ -18,21 +21,17 @@
 (() => {
   'use strict'
 
-  const STORAGE_KEY = 'hbar-ink-drops-v7'
+  const STORAGE_KEY = 'hbar-ink-drops-v8'
   const THEME_KEY = 'hbar-ink-theme'
   const SIZE_KEY = 'hbar-ink-size'
   const FONT_KEY = 'hbar-ink-font'
   const INFO_KEY = 'hbar-ink-info-seen'
   const FOCUS_KEY = 'hbar-ink-focus'
-  const POLICY_KEY = 'hbar-ink-default-policy'
+  const AI_WEIGHT_KEY = 'hbar-ink-ai-weight'
   const RECENT_LIMIT = 50
 
-  const POLICY_CYCLE = ['allow', 'allow_rag_only', 'deny']
-  const POLICY_LABEL = {
-    allow: 'allow',
-    allow_rag_only: 'rag-only',
-    deny: 'deny',
-  }
+  // per-line font faces. null = inherit the document font.
+  const LINE_FONT_CYCLE = [null, 'serif', 'sans', 'mono', 'display']
 
   const els = {
     input: document.getElementById('drop-input'),
@@ -46,7 +45,9 @@
     dropBtn: document.getElementById('drop-btn'),
     presets: document.getElementById('presets'),
     focusToggle: document.getElementById('focus-toggle'),
-    aiPolicyBtn: document.getElementById('ai-policy-btn'),
+    aiSlider: document.getElementById('ai-weight'),
+    aiValue: document.getElementById('ai-weight-value'),
+    lineBtns: Array.from(document.querySelectorAll('.preset-line')),
     search: document.getElementById('search'),
     searchCount: document.getElementById('search-count'),
     exportBtn: document.getElementById('export-md'),
@@ -56,38 +57,53 @@
 
   // session state
   let currentKind = null
-  let currentPolicy = 'allow'
+  let currentAiWeight = 50
   let searchQuery = ''
+  let lastLineBlock = null // last line block the caret was seen in
 
   // ---------- storage ----------
+  // Bring any drop (legacy or current) to the v8 shape: numeric aiWeight,
+  // optional lineFonts array. Legacy aiPolicy strings map onto the slider.
+  function migrateDrop(d) {
+    const aiWeight =
+      typeof d.aiWeight === 'number' ? d.aiWeight
+        : d.aiPolicy === 'deny' ? 0
+        : d.aiPolicy === 'allow_rag_only' ? 50
+        : 100
+    return {
+      kind: null,
+      pinned: false,
+      sealedAt: null,
+      brainId: null,
+      social: false,
+      ...d,
+      aiWeight,
+      lineFonts: Array.isArray(d.lineFonts) ? d.lineFonts : null,
+    }
+  }
+
   function readDrops() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      if (!raw) {
-        // One-time migration from v6/v3 — same shape, add new fields.
-        for (const key of ['hbar-ink-drops-v6', 'hbar-ink-drops-v3']) {
-          const old = localStorage.getItem(key)
-          if (old) {
-            try {
-              const parsed = JSON.parse(old)
-              if (Array.isArray(parsed)) {
-                const upgraded = parsed.map(d => ({
-                  kind: null,
-                  pinned: false,
-                  sealedAt: null,
-                  aiPolicy: 'allow',
-                  ...d,
-                }))
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded))
-                return upgraded
-              }
-            } catch {}
-          }
-        }
-        return []
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed.map(migrateDrop) : []
       }
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed : []
+      // One-time migration from older keys — same shape, new fields.
+      for (const key of ['hbar-ink-drops-v7', 'hbar-ink-drops-v6', 'hbar-ink-drops-v3']) {
+        const old = localStorage.getItem(key)
+        if (old) {
+          try {
+            const parsed = JSON.parse(old)
+            if (Array.isArray(parsed)) {
+              const upgraded = parsed.map(migrateDrop)
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded))
+              return upgraded
+            }
+          } catch {}
+        }
+      }
+      return []
     } catch {
       return []
     }
@@ -97,21 +113,22 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(drops))
   }
 
-  function addDrop(text, destination, kind, aiPolicy) {
-    const trimmed = (text || '').trim()
-    if (!trimmed) return null
+  function addDrop(text, destination, kind, aiWeight, lineFonts) {
+    if (!text || !text.trim()) return null
     const drop = {
       id: crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-      text: trimmed,
+      text: text,
       destination: (destination || '').trim() || null,
       kind: kind || null,
       ts: new Date().toISOString(),
       brainId: null,
       pinned: false,
       sealedAt: null,
-      aiPolicy: aiPolicy || 'allow',
+      social: false,
+      aiWeight: typeof aiWeight === 'number' ? aiWeight : 100,
+      lineFonts: (Array.isArray(lineFonts) && lineFonts.some(Boolean)) ? lineFonts : null,
     }
     const all = readDrops()
     all.unshift(drop)
@@ -149,6 +166,112 @@
     if (idx < 0) return
     all[idx].sealedAt = all[idx].sealedAt ? null : new Date().toISOString()
     writeDrops(all)
+  }
+
+  // Link a drop to hbar.social — the brain-federation social feed. The drop
+  // stays where it is; this flags it to surface there once federation is up.
+  function toggleSocial(id) {
+    const all = readDrops()
+    const idx = all.findIndex(d => d.id === id)
+    if (idx < 0) return
+    all[idx].social = !all[idx].social
+    writeDrops(all)
+  }
+
+  // ---------- line editor ----------
+  // The drop input is a contenteditable surface. Each visual line is one
+  // top-level block; a block may carry data-font to render in another face.
+  function isEditorEmpty() {
+    return els.input.textContent.trim() === ''
+  }
+
+  function updatePlaceholder() {
+    els.input.classList.toggle('is-empty', isEditorEmpty())
+  }
+
+  function clearEditor() {
+    els.input.innerHTML = '<div><br></div>'
+    updatePlaceholder()
+  }
+
+  // Read the editor as an ordered list of { text, font } lines.
+  function readEditorLines() {
+    const lines = []
+    els.input.childNodes.forEach(node => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        lines.push({ text: node.textContent, font: null })
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const font = node.dataset ? (node.dataset.font || null) : null
+        lines.push({ text: node.textContent, font })
+      }
+    })
+    return lines.length ? lines : [{ text: '', font: null }]
+  }
+
+  // Resolve the line block (direct child of the editor) containing a node,
+  // wrapping a stray top-level text node in a block if needed.
+  function blockFromNode(node) {
+    let n = node
+    while (n && n.parentNode && n.parentNode !== els.input) n = n.parentNode
+    if (!n || n.parentNode !== els.input) return null
+    if (n.nodeType === Node.TEXT_NODE) {
+      const div = document.createElement('div')
+      els.input.insertBefore(div, n)
+      div.appendChild(n)
+      return div
+    }
+    return n
+  }
+
+  function currentLineBlock() {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return null
+    if (!els.input.contains(sel.anchorNode)) return null
+    return blockFromNode(sel.anchorNode)
+  }
+
+  function syncLineButtons(font) {
+    els.lineBtns.forEach(b => {
+      b.classList.toggle('active', b.dataset.linefont === font)
+    })
+  }
+
+  function trackCurrentLine() {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return
+    if (!els.input.contains(sel.anchorNode)) return
+    const block = blockFromNode(sel.anchorNode)
+    lastLineBlock = block
+    syncLineButtons(block ? (block.dataset.font || null) : null)
+  }
+
+  function setLineFont(block, font) {
+    if (!block) return
+    if (!font || block.dataset.font === font) {
+      delete block.dataset.font // toggle off → back to the document font
+      syncLineButtons(null)
+    } else {
+      block.dataset.font = font
+      syncLineButtons(font)
+    }
+  }
+
+  function cycleLineFont() {
+    const block = currentLineBlock()
+    if (!block) return
+    const cur = block.dataset.font || null
+    const next = LINE_FONT_CYCLE[(LINE_FONT_CYCLE.indexOf(cur) + 1) % LINE_FONT_CYCLE.length]
+    setLineFont(block, next)
+  }
+
+  function placeCaret(block, atStart) {
+    if (!block) return
+    const r = document.createRange()
+    r.selectNodeContents(block)
+    r.collapse(!!atStart)
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(r)
   }
 
   // ---------- counters / streak ----------
@@ -215,6 +338,25 @@
       || (drop.kind || '').toLowerCase().includes(q)
   }
 
+  // Render a drop's text, honouring any per-line fonts captured at drop time.
+  function renderDropText(container, drop) {
+    const fonts = Array.isArray(drop.lineFonts) ? drop.lineFonts : null
+    if (!fonts || !fonts.some(Boolean)) {
+      container.textContent = drop.text
+      return
+    }
+    const lines = (drop.text || '').split('\n')
+    lines.forEach((ln, i) => {
+      const lineEl = document.createElement('div')
+      lineEl.className = 'drop-line'
+      const f = fonts[i]
+      if (f) lineEl.dataset.font = f
+      if (ln === '') lineEl.appendChild(document.createElement('br'))
+      else lineEl.textContent = ln
+      container.appendChild(lineEl)
+    })
+  }
+
   function renderDrops() {
     const allDrops = readDrops()
     const filtered = allDrops.filter(matchesSearch)
@@ -259,7 +401,7 @@
 
       const text = document.createElement('div')
       text.className = 'drop-text'
-      text.textContent = d.text
+      renderDropText(text, d)
 
       const meta = document.createElement('div')
       meta.className = 'drop-meta'
@@ -287,14 +429,21 @@
 
       const brainStatus = document.createElement('span')
       brainStatus.className = d.brainId ? 'drop-brain saved' : 'drop-brain pending'
-      brainStatus.textContent = d.brainId ? 'in brain' : (d.aiPolicy === 'deny' ? 'local (no brain)' : 'local only')
+      brainStatus.textContent = d.brainId ? 'in brain' : (d.aiWeight === 0 ? 'local (no brain)' : 'local only')
       meta.appendChild(brainStatus)
 
-      if (d.aiPolicy && d.aiPolicy !== 'allow') {
+      if (typeof d.aiWeight === 'number' && d.aiWeight < 100) {
         const ai = document.createElement('span')
-        ai.className = `drop-ai ${d.aiPolicy}`
-        ai.textContent = `· ${POLICY_LABEL[d.aiPolicy] || d.aiPolicy}`
+        ai.className = 'drop-ai' + (d.aiWeight === 0 ? ' deny' : '')
+        ai.textContent = `· ai ${d.aiWeight}%`
         meta.appendChild(ai)
+      }
+
+      if (d.social) {
+        const soc = document.createElement('span')
+        soc.className = 'drop-social-badge'
+        soc.textContent = '· hbar.social'
+        meta.appendChild(soc)
       }
 
       if (d.sealedAt) {
@@ -313,6 +462,16 @@
         renderDrops()
       })
       meta.appendChild(seal)
+
+      const social = document.createElement('button')
+      social.className = d.social ? 'drop-social on' : 'drop-social'
+      social.textContent = d.social ? 'on social' : '→ social'
+      social.title = 'link this drop to hbar.social — the brain-federation social feed'
+      social.addEventListener('click', () => {
+        toggleSocial(d.id)
+        renderDrops()
+      })
+      meta.appendChild(social)
 
       const pin = document.createElement('button')
       pin.className = d.pinned ? 'drop-pin pinned' : 'drop-pin'
@@ -379,19 +538,29 @@
 
   // ---------- input handling ----------
   async function commit() {
-    const text = els.input.value
-    const destination = els.destination.value
-    const kind = currentKind
-    const drop = addDrop(text, destination, kind, currentPolicy)
+    const lines = readEditorLines()
+    // drop blank lines at the head and tail — they carry no thought.
+    while (lines.length > 1 && lines[0].text.trim() === '' && !lines[0].font) lines.shift()
+    while (lines.length > 1 && lines[lines.length - 1].text.trim() === '' && !lines[lines.length - 1].font) lines.pop()
+
+    const text = lines.map(l => l.text).join('\n')
+    if (!text.trim()) {
+      els.status.textContent = ''
+      return
+    }
+    const lineFonts = lines.map(l => l.font || null)
+
+    const drop = addDrop(text, els.destination.value, currentKind, currentAiWeight, lineFonts)
     if (!drop) {
       els.status.textContent = ''
       return
     }
-    els.input.value = ''
+    clearEditor()
     renderDrops()
     els.input.focus()
+    placeCaret(els.input.firstChild, true)
 
-    if (drop.aiPolicy === 'deny') {
+    if (drop.aiWeight === 0) {
       els.status.textContent = 'sealed (local — no brain)'
       setTimeout(() => { els.status.textContent = '' }, 2000)
       return
@@ -407,7 +576,9 @@
           drop_id: drop.id,
           destination: drop.destination,
           kind: drop.kind,
-          ai_policy: drop.aiPolicy,
+          ai_weight: drop.aiWeight,
+          line_fonts: drop.lineFonts,
+          social: drop.social,
           ts: drop.ts,
         },
       }, 5000)
@@ -426,12 +597,33 @@
   }
 
   els.dropBtn.addEventListener('click', () => commit())
+
+  els.input.addEventListener('input', () => {
+    updatePlaceholder()
+    trackCurrentLine()
+  })
+  els.input.addEventListener('keyup', trackCurrentLine)
+  els.input.addEventListener('mouseup', trackCurrentLine)
+  els.input.addEventListener('focus', trackCurrentLine)
+  els.input.addEventListener('paste', (e) => {
+    e.preventDefault()
+    const cd = e.clipboardData || window.clipboardData
+    const txt = cd ? cd.getData('text/plain') : ''
+    if (txt) document.execCommand('insertText', false, txt)
+  })
   els.input.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault()
       commit()
+      return
+    }
+    // Cmd/Ctrl + .  →  cycle the current line's font
+    if ((e.metaKey || e.ctrlKey) && e.key === '.') {
+      e.preventDefault()
+      cycleLineFont()
     }
   })
+
   els.destination.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault()
@@ -443,7 +635,7 @@
     }
   })
 
-  // ---------- presets ----------
+  // ---------- presets (destination + kind) ----------
   function bootPresets() {
     document.querySelectorAll('.preset[data-dest]').forEach(b => {
       b.addEventListener('click', () => {
@@ -464,25 +656,39 @@
         }
       })
     })
+  }
 
-    // AI policy cycle
-    function applyPolicy(p) {
-      currentPolicy = p
-      els.aiPolicyBtn.dataset.policy = p
-      els.aiPolicyBtn.textContent = POLICY_LABEL[p] || p
-      try { localStorage.setItem(POLICY_KEY, p) } catch {}
-    }
-    els.aiPolicyBtn.addEventListener('click', () => {
-      const i = POLICY_CYCLE.indexOf(currentPolicy)
-      const next = POLICY_CYCLE[(i + 1) % POLICY_CYCLE.length]
-      applyPolicy(next)
-    })
-    let saved = 'allow'
+  // ---------- AI-use slider ----------
+  function bootAi() {
+    let w = 50 // starts in the middle
     try {
-      const v = localStorage.getItem(POLICY_KEY)
-      if (POLICY_CYCLE.includes(v)) saved = v
+      const v = parseInt(localStorage.getItem(AI_WEIGHT_KEY), 10)
+      if (!isNaN(v) && v >= 0 && v <= 100) w = v
     } catch {}
-    applyPolicy(saved)
+    currentAiWeight = w
+    els.aiSlider.value = String(w)
+    els.aiValue.textContent = `${w}%`
+    els.aiSlider.addEventListener('input', () => {
+      currentAiWeight = parseInt(els.aiSlider.value, 10) || 0
+      els.aiValue.textContent = `${currentAiWeight}%`
+      try { localStorage.setItem(AI_WEIGHT_KEY, String(currentAiWeight)) } catch {}
+    })
+  }
+
+  // ---------- per-line font row ----------
+  function bootLineFonts() {
+    els.lineBtns.forEach(b => {
+      // mousedown + preventDefault keeps the caret inside the editor so the
+      // font lands on the line the writer was actually in.
+      b.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        const block = (lastLineBlock && els.input.contains(lastLineBlock))
+          ? lastLineBlock
+          : currentLineBlock()
+        setLineFont(block, b.dataset.linefont)
+        els.input.focus()
+      })
+    })
   }
 
   // ---------- search ----------
@@ -522,7 +728,8 @@
       const meta = []
       if (d.destination) meta.push(`to: ${d.destination}`)
       if (d.kind) meta.push(`kind: ${d.kind}`)
-      if (d.aiPolicy && d.aiPolicy !== 'allow') meta.push(`ai: ${d.aiPolicy}`)
+      if (typeof d.aiWeight === 'number' && d.aiWeight < 100) meta.push(`ai: ${d.aiWeight}%`)
+      if (d.social) meta.push('hbar.social')
       if (d.sealedAt) meta.push(`sealed: ${new Date(d.sealedAt).toLocaleString()}`)
       if (d.pinned) meta.push('pinned')
       if (meta.length) {
@@ -559,6 +766,19 @@
       .replace(/'/g, '&#39;')
   }
 
+  // Render a drop body for print, keeping per-line fonts intact.
+  function dropBodyHtml(d) {
+    const fonts = Array.isArray(d.lineFonts) ? d.lineFonts : null
+    if (!fonts || !fonts.some(Boolean)) {
+      return escapeHtml(d.text).replace(/\n/g, '<br>')
+    }
+    return (d.text || '').split('\n').map((ln, i) => {
+      const f = fonts[i]
+      const cls = f ? ` class="lf-${f}"` : ''
+      return `<div${cls}>${escapeHtml(ln) || '<br>'}</div>`
+    }).join('')
+  }
+
   function exportPdf() {
     const drops = readDrops()
     if (drops.length === 0) {
@@ -574,12 +794,13 @@
       meta.push(`<span class="m-time">${escapeHtml(new Date(d.ts).toLocaleString())}</span>`)
       if (d.kind) meta.push(`<span class="m-kind">${escapeHtml(d.kind)}</span>`)
       if (d.destination) meta.push(`<span class="m-dest">→ ${escapeHtml(d.destination)}</span>`)
-      if (d.aiPolicy && d.aiPolicy !== 'allow') meta.push(`<span class="m-ai">${escapeHtml(d.aiPolicy)}</span>`)
+      if (typeof d.aiWeight === 'number' && d.aiWeight < 100) meta.push(`<span class="m-ai">ai ${d.aiWeight}%</span>`)
+      if (d.social) meta.push(`<span class="m-social">hbar.social</span>`)
       if (d.brainId) meta.push(`<span class="m-brain">in brain</span>`)
       if (d.sealedAt) meta.push(`<span class="m-seal">sealed ${escapeHtml(new Date(d.sealedAt).toLocaleString())}</span>`)
       if (d.pinned) meta.push(`<span class="m-pin">pinned</span>`)
       return `<article class="drop">
-        <div class="text">${escapeHtml(d.text).replace(/\n/g, '<br>')}</div>
+        <div class="text">${dropBodyHtml(d)}</div>
         <div class="meta">${meta.join(' · ')}</div>
       </article>`
     }).join('\n')
@@ -588,7 +809,7 @@
 <html><head>
 <meta charset="utf-8">
 <title>hbar.ink — drops export</title>
-<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600&family=Inter:wght@400;500&family=DM+Mono:wght@400&family=Audiowide&display=swap" rel="stylesheet">
 <style>
   @page { margin: 18mm; }
   * { box-sizing: border-box; }
@@ -599,6 +820,10 @@
   article.drop { padding: 18px 0; border-top: 1px solid #e5e7eb; break-inside: avoid; }
   article.drop:first-of-type { border-top: none; }
   .text { font-size: 16px; line-height: 1.7; color: #1f2937; white-space: pre-wrap; margin-bottom: 10px; }
+  .text .lf-serif   { font-family: 'Spectral', Georgia, serif; }
+  .text .lf-sans    { font-family: 'Inter', system-ui, sans-serif; }
+  .text .lf-mono    { font-family: 'DM Mono', ui-monospace, monospace; }
+  .text .lf-display { font-family: 'Audiowide', system-ui, sans-serif; }
   .meta { font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px; color: #9ca3af; letter-spacing: 0.02em; }
   .meta span { margin-right: 4px; }
   .m-dest { color: #6b7280; }
@@ -606,6 +831,7 @@
   .m-seal { color: #8a6f48; font-style: italic; }
   .m-pin { color: #8a6f48; }
   .m-ai { color: #8a6f48; }
+  .m-social { color: #8a6f48; }
   footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px; color: #9ca3af; text-align: center; }
   @media print { body { background: white; } }
 </style>
@@ -630,7 +856,7 @@ ${dropsHtml}
 
   els.exportPdfBtn.addEventListener('click', exportPdf)
 
-  // ---------- theme + size + font pickers ----------
+  // ---------- theme + size + font pickers (document-level) ----------
   function applyTheme(themeClass) {
     const all = ['t-writers-room', 't-night-ink', 't-academia']
     document.documentElement.classList.remove(...all)
@@ -726,11 +952,17 @@ ${dropsHtml}
   }
 
   // ---------- boot ----------
+  try { document.execCommand('defaultParagraphSeparator', false, 'div') } catch {}
+  clearEditor()
   bootPickers()
   bootFocus()
   bootInfo()
   bootPresets()
+  bootAi()
+  bootLineFonts()
   bootSearch()
   renderDrops()
   loadHeaderMeta()
+  els.input.focus()
+  placeCaret(els.input.firstChild, true)
 })()
