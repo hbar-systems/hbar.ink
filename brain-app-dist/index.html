@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=Audiowide&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.8.0">
+  <link rel="stylesheet" href="./styles.css?v=0.9.0">
 </head>
 <body>
   <header class="ink-header">
@@ -37,6 +37,8 @@
             <button data-size="s-l" title="large">L</button>
           </div>
         </div>
+        <button class="ink-info" id="greek-toggle" aria-pressed="false" title="Greek mode — letters type physics symbols (Esc exits)">αβ</button>
+        <button class="ink-info" id="palette-toggle" aria-pressed="false" title="symbol palette — Greek, operators, equations">∑</button>
         <button class="ink-focus" id="focus-toggle" title="focus mode (esc to exit)">focus</button>
         <button class="ink-info" id="info-toggle" title="what is this?">?</button>
         <span id="counter" class="ink-counter">0 today</span>
@@ -113,6 +115,18 @@
       </div>
     </section>
 
+    <section class="ink-section ink-palette" id="palette" aria-label="symbol palette" hidden>
+      <div class="ink-palette-bar">
+        <span class="seg" id="palette-layout" role="group" aria-label="palette layout">
+          <button type="button" data-layout="category" class="on">category</button>
+          <button type="button" data-layout="keyboard">keyboard</button>
+        </span>
+        <button type="button" class="ink-tool-btn" id="desc-toggle" aria-pressed="false">descriptions: off</button>
+        <span class="ink-palette-hint">click a symbol to drop it at the cursor · type \name in the editor for inline completion</span>
+      </div>
+      <div id="palette-board" class="ink-palette-board"></div>
+    </section>
+
     <section class="ink-section ink-search-section" aria-label="filter drops">
       <div class="ink-search-row">
         <input
@@ -149,6 +163,10 @@
     </div>
   </footer>
 
-  <script src="./main.js?v=0.8.0"></script>
+  <div id="ink-complete" class="ink-complete" role="listbox" aria-label="symbol completions" hidden></div>
+  <div id="ink-symcard" class="ink-symcard"></div>
+
+  <script src="./physics.js?v=0.9.0"></script>
+  <script src="./main.js?v=0.9.0"></script>
 </body>
 </html>

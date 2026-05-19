@@ -1,8 +1,16 @@
-// hbar.ink — brain-app v0.8.
+// hbar.ink — brain-app v0.9.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
 // destination, kind, ts, brainId?, pinned, sealedAt?, aiWeight, lineFonts? }.
 // localStorage (immediate UI) + brain memory.write via the bridge.
+//
+// v0.9 — physicist symbol layer (an ink input layer, not a separate tool).
+//   Data lives in physics.js (window.HBARPhysics), lifted from the
+//   experiments/physicist-keyboard prototype. Three surfaces:
+//     - inline \name completion in the editor (primary, LaTeX-style)
+//     - a toggleable ∑ palette panel (category + QWERTY-shaped keyboard)
+//     - Greek mode + Alt+letter — both letter-based, device-independent
+//   See the "physicist symbol layer" section below for the editor glue.
 //
 // v0.8 additions (artistic-writing angle):
 //   - per-line font: the drop input is a line editor — each line can carry
@@ -611,16 +619,46 @@
     const txt = cd ? cd.getData('text/plain') : ''
     if (txt) document.execCommand('insertText', false, txt)
   })
+  // Editor keydown — a single priority chain so the physicist symbol layer
+  // never breaks ink's own shortcuts or normal typing.
   els.input.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault()
-      commit()
+    // 1. inline-completion dropdown owns its nav keys while open
+    if (completion.open) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveCompletion(1); return }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); moveCompletion(-1); return }
+      // plain Enter/Tab accepts; Cmd/Ctrl+Enter falls through to commit
+      if ((e.key === 'Enter' || e.key === 'Tab') && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault(); acceptCompletion(); return
+      }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeCompletion(); return }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
+        closeCompletion() // caret is leaving the \query — let it move freely
+      }
+    }
+    // 2. ink shortcuts — unchanged
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); commit(); return }
+    if ((e.metaKey || e.ctrlKey) && e.key === '.') { e.preventDefault(); cycleLineFont(); return }
+    if (e.metaKey || e.ctrlKey) return
+    // 3. Esc turns Greek mode OFF — it never turns it on (that stays a real
+    //    toggle), so Esc still falls through to ink's focus-mode exit.
+    if (e.key === 'Escape' && greekMode) { e.preventDefault(); e.stopPropagation(); setGreekMode(false); return }
+    // 4. Alt + letter → one-off Greek. Keyed off e.code, not e.key, so it
+    //    survives macOS Option-composition (⌥q would arrive as 'œ').
+    if (e.altKey) {
+      const k = CODE_TO_KEY[e.code]
+      if (k && P && P.physicalMap[k]) {
+        e.preventDefault()
+        insertText(greekSymbolFor(k, e.shiftKey))
+      }
       return
     }
-    // Cmd/Ctrl + .  →  cycle the current line's font
-    if ((e.metaKey || e.ctrlKey) && e.key === '.') {
-      e.preventDefault()
-      cycleLineFont()
+    // 5. Greek mode — physical keys type physics symbols, no modifier
+    if (greekMode && P) {
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key
+      if (k in P.physicalMap) {
+        e.preventDefault()
+        insertText(greekSymbolFor(k, e.shiftKey))
+      }
     }
   })
 
@@ -951,6 +989,367 @@ ${dropsHtml}
     if (!seen && readDrops().length === 0) setInfoOpen(true)
   }
 
+  // ---------- physicist symbol layer ----------
+  // An ink input layer (not a separate tool). Data: window.HBARPhysics
+  // (physics.js). Three surfaces — inline \name completion, the ∑ palette
+  // panel, and Greek mode / Alt+letter. The keydown chain above already
+  // wires the modes; everything else lives here.
+  const P = window.HBARPhysics
+
+  // e.code → physical-key char. Used for Alt+letter so the mapping is the
+  // same on every OS/layout (e.key would be Option-composed on macOS).
+  const CODE_TO_KEY = (() => {
+    const m = {
+      Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+      Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
+    }
+    for (let i = 0; i < 10; i++) m['Digit' + i] = String(i)
+    for (const c of 'abcdefghijklmnopqrstuvwxyz') m['Key' + c.toUpperCase()] = c
+    return m
+  })()
+
+  let physEls = null
+  let greekMode = false
+  let paletteOpen = false
+  let paletteLayout = 'category'
+  let descMode = false
+  const completion = { open: false, items: [], sel: 0, queryLen: 0 }
+
+  function greekSymbolFor(k, shift) {
+    let sym = P.physicalMap[k]
+    if (k >= 'a' && k <= 'z' && shift) sym = P.greekUpper[k] || sym
+    return sym
+  }
+
+  // --- editor insertion (contenteditable; execCommand keeps native undo) ---
+  function ensureEditorSelection() {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount && els.input.contains(sel.anchorNode)) return
+    els.input.focus()
+    placeCaret(els.input.lastChild, false)
+  }
+  function insertText(text) {
+    ensureEditorSelection()
+    document.execCommand('insertText', false, text)
+    updatePlaceholder()
+    trackCurrentLine()
+  }
+  function insertLineBreak() {
+    ensureEditorSelection()
+    document.execCommand('insertParagraph')
+    updatePlaceholder()
+  }
+  function doBackspace() {
+    ensureEditorSelection()
+    document.execCommand('delete')
+    updatePlaceholder()
+  }
+
+  // --- Greek mode ---
+  function setGreekMode(on) {
+    greekMode = on
+    physEls.greekToggle.classList.toggle('active', on)
+    physEls.greekToggle.setAttribute('aria-pressed', on ? 'true' : 'false')
+    if (paletteOpen && paletteLayout === 'keyboard') renderPaletteBoard()
+  }
+
+  // --- description hover card ---
+  function showSymCard(el) {
+    if (!descMode || !el._info) return
+    const card = physEls.symCard
+    card.innerHTML = ''
+    const head = document.createElement('div')
+    head.className = 'symcard-head'
+    if (el._cardSym) {
+      const s = document.createElement('span')
+      s.className = 'symcard-sym'
+      s.textContent = el._cardSym
+      head.appendChild(s)
+    }
+    const n = document.createElement('span')
+    n.className = 'symcard-name'
+    n.textContent = el._info.n
+    head.appendChild(n)
+    const d = document.createElement('div')
+    d.className = 'symcard-desc'
+    d.textContent = el._info.d
+    card.appendChild(head)
+    card.appendChild(d)
+    card.style.display = 'block'
+    const r = el.getBoundingClientRect()
+    const cw = card.offsetWidth, ch = card.offsetHeight
+    let left = r.left + r.width / 2 - cw / 2
+    left = Math.max(8, Math.min(left, window.innerWidth - cw - 8))
+    let top = r.top - ch - 10
+    if (top < 8) top = r.bottom + 10
+    card.style.left = left + 'px'
+    card.style.top = top + 'px'
+  }
+  function hideSymCard() { physEls.symCard.style.display = 'none' }
+
+  // --- palette panel ---
+  function makePalKey(opts) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'ink-pal-key' + (opts.cls ? ' ' + opts.cls.join(' ') : '')
+    b.textContent = opts.show != null ? opts.show : (opts.sym || '')
+    if (opts.snippetName != null) {
+      const n = document.createElement('span')
+      n.className = 'pal-name'
+      n.textContent = opts.snippetName
+      b.prepend(n)
+    }
+    if (opts.phys != null) {
+      const p = document.createElement('span')
+      p.className = 'pal-phys'
+      p.textContent = opts.phys
+      b.appendChild(p)
+    }
+    b._info = opts.info || null
+    b._cardSym = opts.cardSym != null ? opts.cardSym : (opts.show || opts.sym || '')
+    // mousedown + preventDefault keeps the editor's caret/selection alive,
+    // so the symbol lands where the writer actually was.
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); opts.onAction() })
+    b.addEventListener('mouseenter', () => showSymCard(b))
+    b.addEventListener('mouseleave', hideSymCard)
+    return b
+  }
+
+  function renderCategory(board) {
+    for (const panel of P.panels) {
+      const sec = document.createElement('section')
+      sec.className = 'ink-pal-group'
+      const h = document.createElement('h3')
+      h.textContent = panel.title
+      sec.appendChild(h)
+      const row = document.createElement('div')
+      row.className = 'ink-pal-row'
+      for (const item of panel.keys) {
+        if (panel.snippet) {
+          row.appendChild(makePalKey({
+            sym: item.sym, show: item.sym, snippetName: item.name, cls: ['snippet'],
+            info: { n: item.name, d: item.idea }, cardSym: '',
+            onAction: () => insertText(item.sym),
+          }))
+        } else if (panel.accent) {
+          row.appendChild(makePalKey({
+            sym: item.sym, show: item.show, info: P.desc[item.sym], cardSym: item.show,
+            onAction: () => insertText(item.sym),
+          }))
+        } else {
+          const sym = item
+          row.appendChild(makePalKey({
+            sym, show: sym, info: P.desc[sym], phys: P.symToPhys[sym],
+            cls: sym === 'ℏ' ? ['hbar'] : null,
+            onAction: () => insertText(sym),
+          }))
+        }
+      }
+      sec.appendChild(row)
+      board.appendChild(sec)
+    }
+  }
+
+  function specialAction(kind) {
+    return {
+      backspace: doBackspace,
+      tab: () => insertText('    '),
+      enter: insertLineBreak,
+      space: () => insertText(' '),
+      mode: () => setGreekMode(!greekMode),
+      shift: () => {},
+      alt: () => {},
+    }[kind]
+  }
+  function renderKeyboard(board) {
+    const kb = document.createElement('div')
+    kb.className = 'ink-pal-kb'
+    for (const rowDef of P.kbRows) {
+      const row = document.createElement('div')
+      row.className = 'ink-pal-kbrow'
+      for (const k of rowDef) {
+        if (k.special) {
+          const b = makePalKey({
+            sym: '', show: k.label, info: k.info, cardSym: '',
+            cls: ['kb', 'sp'], onAction: specialAction(k.kind),
+          })
+          b.style.width = P.spWidth[k.kind] + 'px'
+          if (k.kind === 'mode' && greekMode) b.classList.add('on')
+          row.appendChild(b)
+        } else {
+          row.appendChild(makePalKey({
+            sym: k.sym, show: k.sym, info: P.desc[k.sym], phys: k.phys,
+            cls: k.sym === 'ℏ' ? ['kb', 'hbar'] : ['kb'],
+            onAction: () => insertText(k.sym),
+          }))
+        }
+      }
+      kb.appendChild(row)
+    }
+    board.appendChild(kb)
+  }
+
+  function renderPaletteBoard() {
+    const board = physEls.paletteBoard
+    board.innerHTML = ''
+    hideSymCard()
+    if (paletteLayout === 'keyboard') renderKeyboard(board)
+    else renderCategory(board)
+  }
+
+  function setPaletteOpen(on) {
+    paletteOpen = on
+    physEls.palette.hidden = !on
+    physEls.paletteToggle.classList.toggle('active', on)
+    physEls.paletteToggle.setAttribute('aria-pressed', on ? 'true' : 'false')
+    if (on) renderPaletteBoard()
+    else hideSymCard()
+  }
+
+  // --- inline \name completion ---
+  function closeCompletion() {
+    if (!completion.open) return
+    completion.open = false
+    completion.items = []
+    physEls.complete.hidden = true
+  }
+  function moveCompletion(d) {
+    if (!completion.items.length) return
+    completion.sel = (completion.sel + d + completion.items.length) % completion.items.length
+    renderCompletionList()
+  }
+  function caretRect() {
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) return null
+    const r = sel.getRangeAt(0).cloneRange()
+    r.collapse(true)
+    const rects = r.getClientRects()
+    if (rects && rects.length) return rects[0]
+    const br = r.getBoundingClientRect()
+    if (br && (br.width || br.height || br.top)) return br
+    const block = currentLineBlock()
+    return block ? block.getBoundingClientRect() : null
+  }
+  function renderCompletionList() {
+    const box = physEls.complete
+    box.innerHTML = ''
+    completion.items.forEach((en, i) => {
+      const row = document.createElement('div')
+      row.className = 'ink-cmp-row' + (i === completion.sel ? ' sel' : '')
+      row.setAttribute('role', 'option')
+      const sym = document.createElement('span')
+      sym.className = 'ink-cmp-sym'
+      sym.textContent = en.show
+      const name = document.createElement('span')
+      name.className = 'ink-cmp-name'
+      name.textContent = en.name
+      const desc = document.createElement('span')
+      desc.className = 'ink-cmp-desc'
+      desc.textContent = en.info ? en.info.d : ''
+      row.appendChild(sym)
+      row.appendChild(name)
+      row.appendChild(desc)
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        completion.sel = i
+        acceptCompletion()
+      })
+      box.appendChild(row)
+    })
+    const selRow = box.children[completion.sel]
+    if (selRow) selRow.scrollIntoView({ block: 'nearest' })
+  }
+  function checkCompletion() {
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount || !els.input.contains(sel.anchorNode)) { closeCompletion(); return }
+    const node = sel.anchorNode
+    if (node.nodeType !== Node.TEXT_NODE) { closeCompletion(); return }
+    const before = node.textContent.slice(0, sel.anchorOffset)
+    const m = before.match(/\\([A-Za-z0-9]*)$/) // trigger: backslash, LaTeX-style
+    if (!m) { closeCompletion(); return }
+    const query = m[1].toLowerCase()
+    completion.queryLen = m[1].length
+    const items = query
+      ? P.matchSearch(query).slice(0, 24)
+      : P.commonEntries.slice(0, 24)
+    if (!items.length) { closeCompletion(); return }
+    completion.items = items
+    completion.sel = 0
+    completion.open = true
+    physEls.complete.hidden = false
+    renderCompletionList()
+    const rect = caretRect()
+    if (rect) {
+      const box = physEls.complete
+      const bw = box.offsetWidth || 320
+      const bh = box.offsetHeight || 200
+      let left = Math.max(8, Math.min(rect.left, window.innerWidth - bw - 8))
+      let top = rect.bottom + 6
+      if (top + bh > window.innerHeight - 8) top = rect.top - bh - 6
+      box.style.left = left + 'px'
+      box.style.top = top + 'px'
+    }
+  }
+  function acceptCompletion() {
+    const item = completion.items[completion.sel]
+    if (!item) { closeCompletion(); return }
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount) {
+      const range = sel.getRangeAt(0)
+      const node = range.startContainer
+      if (node.nodeType === Node.TEXT_NODE) {
+        // select the "\query" we're replacing, then overwrite it
+        const offset = range.startOffset
+        const start = Math.max(0, offset - (completion.queryLen + 1))
+        const r = document.createRange()
+        r.setStart(node, start)
+        r.setEnd(node, offset)
+        sel.removeAllRanges()
+        sel.addRange(r)
+      }
+    }
+    document.execCommand('insertText', false, item.sym)
+    closeCompletion()
+    updatePlaceholder()
+    trackCurrentLine()
+  }
+
+  function bootPhysics() {
+    if (!P) return // physics.js missing — degrade to plain ink
+    physEls = {
+      greekToggle: document.getElementById('greek-toggle'),
+      paletteToggle: document.getElementById('palette-toggle'),
+      palette: document.getElementById('palette'),
+      paletteLayout: document.getElementById('palette-layout'),
+      paletteBoard: document.getElementById('palette-board'),
+      descToggle: document.getElementById('desc-toggle'),
+      complete: document.getElementById('ink-complete'),
+      symCard: document.getElementById('ink-symcard'),
+    }
+    physEls.greekToggle.addEventListener('click', () => setGreekMode(!greekMode))
+    physEls.paletteToggle.addEventListener('click', () => setPaletteOpen(!paletteOpen))
+    physEls.paletteLayout.addEventListener('click', (e) => {
+      const btn = e.target.closest('button')
+      if (!btn) return
+      paletteLayout = btn.dataset.layout
+      physEls.paletteLayout.querySelectorAll('button')
+        .forEach(b => b.classList.toggle('on', b === btn))
+      renderPaletteBoard()
+    })
+    physEls.descToggle.addEventListener('click', () => {
+      descMode = !descMode
+      physEls.descToggle.classList.toggle('active', descMode)
+      physEls.descToggle.setAttribute('aria-pressed', descMode ? 'true' : 'false')
+      physEls.descToggle.textContent = 'descriptions: ' + (descMode ? 'on' : 'off')
+      if (!descMode) hideSymCard()
+    })
+    // inline-completion lifecycle
+    els.input.addEventListener('input', checkCompletion)
+    els.input.addEventListener('blur', () => setTimeout(closeCompletion, 120))
+    els.input.addEventListener('mousedown', closeCompletion)
+    window.addEventListener('scroll', () => { hideSymCard(); closeCompletion() }, true)
+  }
+
   // ---------- boot ----------
   try { document.execCommand('defaultParagraphSeparator', false, 'div') } catch {}
   clearEditor()
@@ -960,6 +1359,7 @@ ${dropsHtml}
   bootPresets()
   bootAi()
   bootLineFonts()
+  bootPhysics()
   bootSearch()
   renderDrops()
   loadHeaderMeta()

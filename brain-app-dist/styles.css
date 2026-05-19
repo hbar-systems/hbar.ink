@@ -21,6 +21,8 @@
   --face-sans:    'Inter', system-ui, -apple-system, sans-serif;
   --face-mono:    'DM Mono', ui-monospace, 'JetBrains Mono', monospace;
   --face-display: 'Audiowide', 'Spectral', system-ui, sans-serif;
+  /* math face — crisp symbol rendering in the physicist palette */
+  --face-math: 'STIX Two Math', 'Latin Modern Math', 'Cambria Math', 'Spectral', Georgia, serif;
   /* document font — reassigned by the f-serif / f-sans / f-mono picker */
   --serif:     var(--face-serif);
   --mono:      var(--face-mono);
@@ -191,7 +193,8 @@ body {
   letter-spacing: 0.04em;
 }
 .ink-info:hover, .ink-focus:hover { color: var(--text); }
-.ink-focus.active {
+.ink-focus.active,
+.ink-info.active {
   background: var(--surface);
   color: var(--text);
 }
@@ -694,3 +697,209 @@ html.focus-on #drop-input {
   color: var(--muted);
   opacity: 1;
 }
+
+/* ============================================================= */
+/* physicist symbol layer (v0.9) — palette panel, inline          */
+/* completion dropdown, description hover card.                   */
+/* ============================================================= */
+
+/* ---------- palette panel ---------- */
+.ink-palette[hidden] { display: none; }
+.ink-palette > * { max-width: 900px; }
+
+.ink-palette-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+}
+.ink-palette-hint {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.01em;
+}
+
+/* segmented layout switch */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.seg button {
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--faint);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button:hover { color: var(--text); }
+.seg button.on { background: var(--surface); color: var(--text); }
+
+.ink-tool-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ink-palette-board { overflow-x: auto; }
+
+/* ---------- category groups ---------- */
+.ink-pal-group { margin-bottom: 14px; }
+.ink-pal-group h3 {
+  margin: 0 0 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+.ink-pal-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- a palette key ---------- */
+.ink-pal-key {
+  position: relative;
+  min-width: 42px;
+  height: 42px;
+  padding: 0 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-family: var(--face-math);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.04s ease;
+  user-select: none;
+}
+.ink-pal-key:hover { border-color: var(--accent); }
+.ink-pal-key:active { transform: translateY(1px); background: var(--bg); }
+
+.ink-pal-key .pal-phys {
+  position: absolute;
+  bottom: 1px;
+  right: 3px;
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--faint);
+}
+.ink-pal-key.hbar {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-size: 23px;
+}
+
+/* equation snippet keys — wider, with a name label */
+.ink-pal-key.snippet {
+  min-width: auto;
+  height: auto;
+  padding: 9px 12px;
+  font-size: 17px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.ink-pal-key.snippet .pal-name {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* ---------- keyboard layout ---------- */
+.ink-pal-kb { width: fit-content; margin: 4px auto 0; }
+.ink-pal-kbrow { display: flex; gap: 6px; margin-bottom: 6px; }
+.ink-pal-key.kb { width: 48px; min-width: 48px; height: 48px; font-size: 21px; }
+.ink-pal-key.sp {
+  min-width: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+.ink-pal-key.sp.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+/* ---------- inline completion dropdown ---------- */
+.ink-complete {
+  position: fixed;
+  z-index: 80;
+  width: 340px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  padding: 4px;
+}
+.ink-complete[hidden] { display: none; }
+.ink-cmp-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.ink-cmp-row.sel { background: var(--surface); }
+.ink-cmp-sym {
+  font-family: var(--face-math);
+  font-size: 17px;
+  color: var(--text);
+  min-width: 22px;
+  flex-shrink: 0;
+}
+.ink-cmp-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-soft);
+  flex-shrink: 0;
+}
+.ink-cmp-desc {
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- description hover card ---------- */
+.ink-symcard {
+  position: fixed;
+  z-index: 90;
+  display: none;
+  max-width: 264px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+.symcard-head { display: flex; align-items: baseline; gap: 8px; }
+.symcard-sym { font-family: var(--face-math); font-size: 22px; color: var(--text); }
+.symcard-name { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--accent); }
+.symcard-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* keep the symbol layer out of the way in focus mode */
+html.focus-on .ink-palette { display: none; }
