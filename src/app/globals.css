@@ -374,6 +374,14 @@
   outline: none;
 }
 
+/* the writing surface is hbar's: the mouse cursor becomes ℏ over it, and the
+ * blinking text caret is tinted the olive accent. (the native caret glyph
+ * itself can't be swapped — this is the achievable, visible version.) */
+#ink-editor {
+  caret-color: #8a6f48;
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28"><text x="2" y="21" font-size="22" font-family="Georgia, serif" fill="%231f2937">ℏ</text></svg>') 5 21, text;
+}
+
 /* placeholder — the editor always holds one blank block, so JS toggles
  * .is-empty rather than relying on :empty. */
 #ink-editor.is-empty::before {

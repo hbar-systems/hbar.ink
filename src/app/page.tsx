@@ -72,12 +72,41 @@ function fmtTime(iso: string) {
   }
 }
 
+// One result bar in the (you chose) poll. The poll is rigged — that's the
+// point — so the bars are fixed, not computed.
+function VoteBar({ label, pct, accent, grow }: { label: string; pct: number; accent?: boolean; grow: boolean }) {
+  return (
+    <div style={{ marginBottom: '0.85rem' }}>
+      <div
+        className="flex justify-between"
+        style={{ fontSize: '12px', color: accent ? '#8a6f48' : '#9ca3af', marginBottom: '0.35rem', letterSpacing: '0.02em' }}
+      >
+        <span>{label}</span>
+        <span>{pct}%</span>
+      </div>
+      <div style={{ height: 8, background: '#ece9e3', borderRadius: 4, overflow: 'hidden' }}>
+        <div
+          style={{
+            height: '100%',
+            width: grow ? `${pct}%` : '0%',
+            background: accent ? '#8a6f48' : '#cfcbc3',
+            borderRadius: 4,
+            transition: 'width .9s cubic-bezier(.22,1,.36,1)',
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [userDrops, setUserDrops] = useState<Drop[]>([])
   const [destination, setDestination] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState('')
   const [activeLineFont, setActiveLineFont] = useState<string | null>(null)
+  const [voted, setVoted] = useState<string | null>(null)
+  const [grow, setGrow] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
 
   // ---------- line editor helpers ----------
@@ -186,6 +215,13 @@ export default function Home() {
     if (!loaded) return
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(userDrops)) } catch {}
   }, [userDrops, loaded])
+
+  // grow the rigged poll's bars in once a vote lands
+  useEffect(() => {
+    if (!voted) return
+    const t = setTimeout(() => setGrow(true), 40)
+    return () => clearTimeout(t)
+  }, [voted])
 
   const commit = () => {
     const lines = readEditorLines()
@@ -441,6 +477,124 @@ export default function Home() {
           </div>
         </section>
       </main>
+
+      {/* ───── manifesto: the scroll-down hook. names Google once as the
+           avatar, then attacks the category. medium matches message —
+           this reads as a quiet, private page, not a SaaS comparison. ───── */}
+      <section className="px-6 pt-24 pb-28" style={{ borderTop: '1px solid #ece9e3' }}>
+        <div className="max-w-3xl mx-auto" style={{ color: '#1f2937' }}>
+          <p style={{ fontSize: '1.85rem', lineHeight: 1.4, letterSpacing: '-0.01em', marginBottom: '1.5rem' }}>
+            Google Docs is where your words go to work for someone else.
+          </p>
+          <p style={{ fontSize: '1.85rem', lineHeight: 1.4, letterSpacing: '-0.01em', marginBottom: '2.6rem' }}>
+            hbar.ink is where they stay yours.
+          </p>
+
+          <div style={{ fontSize: '1.2rem', lineHeight: 1.95, color: '#54514b', marginBottom: '2.4rem' }}>
+            <div>Writing made personal.</div>
+            <div>Writing made private.</div>
+            <div>Writing as art.</div>
+          </div>
+
+          <div style={{ fontSize: '1.2rem', lineHeight: 1.95, color: '#54514b' }}>
+            <div>Your words live in your brain.</div>
+            <div>Not on a server that reads them.</div>
+          </div>
+
+          {/* the (you chose) poll — openly rigged, and the rig is the punchline */}
+          <div
+            style={{ marginTop: '3.5rem', paddingTop: '2.25rem', borderTop: '1px solid #ece9e3', fontFamily: 'ui-monospace, "DM Mono", monospace' }}
+          >
+            {!voted ? (
+              <>
+                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '1.1rem', letterSpacing: '0.02em' }}>
+                  where should your words live?
+                </div>
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setVoted('ink')}
+                    className="transition-colors"
+                    style={{
+                      padding: '0.6rem 1.1rem', borderRadius: 6, fontSize: '13px',
+                      border: '1px solid #8a6f48', color: '#8a6f48', background: 'transparent', cursor: 'pointer',
+                    }}
+                  >ℏ hbar.ink</button>
+                  <button
+                    type="button"
+                    onClick={() => setVoted('gdocs')}
+                    className="transition-colors"
+                    style={{
+                      padding: '0.6rem 1.1rem', borderRadius: 6, fontSize: '13px',
+                      border: '1px solid #d6d3cd', color: '#6b7280', background: 'transparent', cursor: 'pointer',
+                    }}
+                  >Google Docs</button>
+                </div>
+                <div style={{ fontSize: '11px', color: '#c0bdb5', marginTop: '0.85rem' }}>
+                  cast your vote
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '1.1rem', letterSpacing: '0.02em' }}>
+                  where words should live — results
+                </div>
+                <VoteBar label="hbar.ink" pct={98} accent grow={grow} />
+                <VoteBar label="Google Docs" pct={2} grow={grow} />
+                <div style={{ fontSize: '12px', color: '#9a958c', marginTop: '1.4rem', lineHeight: 1.65, fontStyle: 'italic', maxWidth: '40rem' }}>
+                  {voted === 'gdocs'
+                    ? "you voted Google Docs. the house voted hbar.ink. the house always wins. your vote, like everything on this page, never left your browser."
+                    : "this poll is rigged. so is the one deciding what your documents are worth to an ad model. your vote here never left your browser."}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* CTA back to the install path — the instruction line (get-a-brain
+               is the link), then the copy-pastable repo, then a shot of where
+               it goes (the brain's Apps tab). */}
+          <div style={{ marginTop: '3.5rem' }}>
+            <p style={{ fontSize: '1.05rem', color: '#1f2937', lineHeight: 1.6, marginBottom: '1.4rem' }}>
+              when you{' '}
+              <a
+                href="https://brainfoundry.ai/get-a-brain"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:opacity-70 transition-opacity"
+                style={{ color: '#1f2937', textDecoration: 'underline', textDecorationColor: '#cfcbc3', textUnderlineOffset: '4px' }}
+              >get-a-brain</a>
+              , go to the app section and paste this link:
+            </p>
+
+            <div
+              className="select-all"
+              style={{
+                display: 'inline-block',
+                fontFamily: 'ui-monospace, "DM Mono", monospace',
+                fontSize: '13px',
+                color: '#54514b',
+                background: 'rgba(255,255,255,0.55)',
+                border: '1px solid #e4e0d8',
+                borderRadius: 6,
+                padding: '0.5rem 0.8rem',
+                userSelect: 'all',
+              }}
+            >https://github.com/hbar-systems/hbar.ink</div>
+
+            <figure style={{ marginTop: '1.75rem' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/hbar-brain-ink-white-main.png"
+                alt="The brain's Apps tab — paste the hbar.ink repo to install it as a sandboxed tab in your own brain."
+                style={{ width: '100%', height: 'auto', borderRadius: 8, border: '1px solid #e4e0d8', display: 'block' }}
+              />
+              <figcaption
+                style={{ fontFamily: 'ui-monospace, "DM Mono", monospace', fontSize: '11px', color: '#9a958c', marginTop: '0.6rem', letterSpacing: '0.02em' }}
+              >paste the repo into your brain&apos;s Apps tab — it installs as a sandboxed tab you own.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
 
       <footer className="px-6 py-6" style={{ borderTop: '1px solid #e5e7eb' }}>
         <div className="max-w-3xl mx-auto flex justify-between items-center text-[11px] text-gray-400">
