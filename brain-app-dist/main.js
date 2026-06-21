@@ -809,13 +809,45 @@
   function closeExport() {
     els.exportOverlay.hidden = true
   }
+  // The brain renders apps in a sandbox without allow-downloads / allow-popups
+  // / allow-modals, so real downloads, popups and print() are all blocked there.
+  // Top level (standalone page, hbar.ink website, or a brain that has enabled
+  // allow-downloads) CAN download; embedded falls back to the copy panel.
+  const isEmbedded = (() => { try { return window.self !== window.top } catch { return true } })()
+
+  function exportNotify(msg) {
+    if (els.status) {
+      els.status.textContent = msg
+      setTimeout(() => { if (els.status.textContent === msg) els.status.textContent = '' }, 2500)
+    }
+  }
+
+  function downloadFile(filename, text, mime) {
+    try {
+      const blob = new Blob([text], { type: mime })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      return true
+    } catch { return false }
+  }
+
   function exportMd() {
-    if (readDrops().length === 0) {
-      alert('nothing to export — drop a thought first.')
+    if (readDrops().length === 0) { exportNotify('nothing to export — drop a thought first.'); return }
+    const md = buildMarkdown()
+    if (!isEmbedded && downloadFile('hbar-ink-drops.md', md, 'text/markdown;charset=utf-8')) {
+      exportNotify('downloaded hbar-ink-drops.md')
       return
     }
-    openExport(buildMarkdown(),
-      'select all (⌘A / Ctrl+A) and copy — or hit copy. paste into a .md file to keep it.')
+    openExport(md, isEmbedded
+      ? 'your brain sandboxes apps, so direct download is off here — copy this, or open hbar.ink in a browser tab to download. (operator: add allow-downloads to the app iframe.)'
+      : 'select all (⌘A / Ctrl+A) and copy — or hit copy. paste into a .md file to keep it.')
   }
 
   els.exportBtn.addEventListener('click', exportMd)
@@ -864,8 +896,11 @@
 
   function exportPdf() {
     const drops = readDrops()
-    if (drops.length === 0) {
-      alert('nothing to export — drop a thought first.')
+    if (drops.length === 0) { exportNotify('nothing to export — drop a thought first.'); return }
+    if (isEmbedded) {
+      // sandboxed brain iframe: no popups / modals / print. Fall back to copy.
+      openExport(buildMarkdown(),
+        'your brain sandboxes apps, so PDF/print is blocked here — copy this Markdown, or open hbar.ink in a browser tab to save a PDF. (operator: add allow-downloads allow-modals to the app iframe.)')
       return
     }
     const generated = new Date().toISOString()
@@ -924,20 +959,31 @@
 <div class="stats">${drops.length} drops · ${inBrain} in brain · ${sealed} sealed · exported ${escapeHtml(generated)}</div>
 ${dropsHtml}
 <footer>part of hbar.systems</footer>
-<script>setTimeout(() => window.print(), 400)<\/script>
 </body></html>`
 
-    const w = window.open('', '_blank')
-    if (!w) {
-      // sandboxed brain iframe — popups are blocked. Fall back to the
-      // copyable panel with the same content as Markdown.
-      openExport(buildMarkdown(),
-        'PDF needs a popup, which the brain blocks for apps — here is the same content as Markdown. copy it, or use export .md.')
-      return
+    printViaIframe(html)
+    exportNotify('opening print — choose “Save as PDF”')
+  }
+
+  // Print without a popup: write the export HTML into a hidden same-origin
+  // iframe and print that. Works at top level; the brain sandbox blocks it
+  // (handled above by the isEmbedded branch).
+  function printViaIframe(html) {
+    const frame = document.createElement('iframe')
+    frame.setAttribute('aria-hidden', 'true')
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
+    document.body.appendChild(frame)
+    let printed = false
+    const fire = () => {
+      if (printed) return
+      printed = true
+      try { frame.contentWindow.focus(); frame.contentWindow.print() } catch {}
+      setTimeout(() => frame.remove(), 1500)
     }
-    w.document.open()
-    w.document.write(html)
-    w.document.close()
+    const doc = frame.contentWindow.document
+    doc.open(); doc.write(html); doc.close()
+    frame.onload = () => setTimeout(fire, 400)
+    setTimeout(fire, 1200) // backstop if onload doesn't fire for written docs
   }
 
   els.exportPdfBtn.addEventListener('click', exportPdf)
