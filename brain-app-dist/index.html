@@ -6,8 +6,8 @@
   <title>hbar.ink</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=Audiowide&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.9.2">
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=EB+Garamond:wght@400;500&family=Audiowide&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=0.10.0">
 </head>
 <body>
   <header class="ink-header">
@@ -25,6 +25,7 @@
             <button data-theme="t-writers-room" title="Writer's Room">W</button>
             <button data-theme="t-night-ink" title="Night Ink">N</button>
             <button data-theme="t-academia" title="Academia">A</button>
+            <button data-theme="t-blog" title="Blog — matches hbar.blog">B</button>
           </div>
           <div class="ink-picker" role="group" aria-label="font family">
             <button data-font="f-serif" title="Spectral (serif)">Aa</button>
@@ -37,7 +38,7 @@
             <button data-size="s-l" title="large">L</button>
           </div>
         </div>
-        <button class="ink-info" id="greek-toggle" aria-pressed="false" title="Greek mode — letters type physics symbols (Esc exits)">αβ</button>
+        <button class="ink-info" id="greek-toggle" aria-pressed="false" title="Greek typing — when on, letters become symbols as you type (a→α, p→π). Esc exits.">αβ</button>
         <button class="ink-info" id="palette-toggle" aria-pressed="false" title="symbol palette — Greek, operators, equations">∑</button>
         <button class="ink-focus" id="focus-toggle" title="focus mode (esc to exit)">focus</button>
         <button class="ink-info" id="info-toggle" title="what is this?">?</button>
@@ -65,6 +66,10 @@
         spellcheck="false"
         data-placeholder="a thought."
       ></div>
+      <div class="ink-greek-hint" id="greek-hint" hidden>
+        <span class="greek-dot">αβ</span>
+        Greek mode on — type letters for symbols (<b>a</b>→α, <b>p</b>→π, <b>l</b>→λ). Press <b>Esc</b> to exit, or ∑ for the full palette.
+      </div>
       <div class="ink-instrument-row">
         <input
           id="destination"
@@ -78,13 +83,17 @@
       </div>
       <div class="ink-presets" id="presets">
         <span class="preset-label">to:</span>
-        <button class="preset" data-dest="hbar.brain/episodic/">brain/ep</button>
-        <button class="preset" data-dest="hbar.brain/semantic/">brain/sem</button>
-        <button class="preset" data-dest="hbar.psychology/">psychology</button>
-        <button class="preset" data-dest="hbar.work/">work</button>
-        <button class="preset" data-dest="hbar.science/">science</button>
-        <button class="preset" data-dest="hbar.systems/">systems</button>
-        <button class="preset" data-dest="hbar.social/">social</button>
+        <span class="preset-hbar" aria-hidden="true">ℏ</span>
+        <button class="preset" data-dest="hbar.brain/episodic/" data-tint="#6f8099">brain/ep</button>
+        <button class="preset" data-dest="hbar.brain/semantic/" data-tint="#7d8aa0">brain/sem</button>
+        <button class="preset" data-dest="hbar.psychology/" data-tint="#8a7aa3">psyche</button>
+        <button class="preset" data-dest="hbar.mirror/" data-tint="#6f9088">mirror</button>
+        <span class="preset-sep" title="published — outward, text">·</span>
+        <button class="preset" data-dest="hbar.blog/" data-tint="#d4af37">blog</button>
+        <button class="preset" data-dest="hbar.art/hbarnotes/" data-tint="#bf5a93">art</button>
+        <button class="preset" data-dest="hbar.science/" data-tint="#3d9aa8">science</button>
+        <button class="preset" data-dest="hbar.signals/" data-tint="#9a7bd0">signals</button>
+        <button class="preset" data-dest="hbar.social/" data-tint="#4f93d6">social</button>
         <span class="preset-sep">·</span>
         <span class="preset-label">ai:</span>
         <input
@@ -182,6 +191,6 @@
   </div>
 
   <script src="./physics.js?v=0.9.1"></script>
-  <script src="./main.js?v=0.9.2"></script>
+  <script src="./main.js?v=0.10.0"></script>
 </body>
 </html>

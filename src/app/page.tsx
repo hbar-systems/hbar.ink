@@ -37,6 +37,25 @@ const LINE_FONT_STACK: Record<string, string> = {
   display: 'var(--font-audiowide), system-ui, sans-serif',
 }
 
+// destination presets — mirror the brain-app's `to: ℏ` picker.
+// "keep" = inward (becomes memory); "publish" = outward, text.
+// Each carries a signature shade shown as a dot. NOTE: picking one only
+// tags the drop's destination — it does not yet publish to that system.
+type DestPreset = { dest: string; label: string; tint: string }
+const DEST_KEEP: DestPreset[] = [
+  { dest: 'hbar.brain/episodic/', label: 'brain/ep', tint: '#6f8099' },
+  { dest: 'hbar.brain/semantic/', label: 'brain/sem', tint: '#7d8aa0' },
+  { dest: 'hbar.psychology/', label: 'psyche', tint: '#8a7aa3' },
+  { dest: 'hbar.mirror/', label: 'mirror', tint: '#6f9088' },
+]
+const DEST_PUBLISH: DestPreset[] = [
+  { dest: 'hbar.blog/', label: 'blog', tint: '#d4af37' },
+  { dest: 'hbar.art/hbarnotes/', label: 'art', tint: '#bf5a93' },
+  { dest: 'hbar.science/', label: 'science', tint: '#3d9aa8' },
+  { dest: 'hbar.signals/', label: 'signals', tint: '#9a7bd0' },
+  { dest: 'hbar.social/', label: 'social', tint: '#4f93d6' },
+]
+
 const SEEDED_DROP: Drop = {
   id: 'seed-2026-05-09-hbar-manifesto',
   text:
@@ -79,17 +98,17 @@ function VoteBar({ label, pct, accent, grow }: { label: string; pct: number; acc
     <div style={{ marginBottom: '0.85rem' }}>
       <div
         className="flex justify-between"
-        style={{ fontSize: '12px', color: accent ? '#8a6f48' : '#9ca3af', marginBottom: '0.35rem', letterSpacing: '0.02em' }}
+        style={{ fontSize: '12px', color: accent ? 'var(--ink-accent)' : 'var(--ink-faint)', marginBottom: '0.35rem', letterSpacing: '0.02em' }}
       >
         <span>{label}</span>
         <span>{pct}%</span>
       </div>
-      <div style={{ height: 8, background: '#ece9e3', borderRadius: 4, overflow: 'hidden' }}>
+      <div style={{ height: 8, background: 'var(--ink-hairline)', borderRadius: 4, overflow: 'hidden' }}>
         <div
           style={{
             height: '100%',
             width: grow ? `${pct}%` : '0%',
-            background: accent ? '#8a6f48' : '#cfcbc3',
+            background: accent ? 'var(--ink-accent)' : 'var(--ink-whisper)',
             borderRadius: 4,
             transition: 'width .9s cubic-bezier(.22,1,.36,1)',
           }}
@@ -102,12 +121,25 @@ function VoteBar({ label, pct, accent, grow }: { label: string; pct: number; acc
 export default function Home() {
   const [userDrops, setUserDrops] = useState<Drop[]>([])
   const [destination, setDestination] = useState('')
+  const [destTint, setDestTint] = useState<string | null>(null)
+  const [inkTheme, setInkTheme] = useState<'writers' | 'night' | 'academia' | 'blog'>('writers')
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState('')
   const [activeLineFont, setActiveLineFont] = useState<string | null>(null)
   const [voted, setVoted] = useState<string | null>(null)
   const [grow, setGrow] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
+
+  // instrument theme (Writer's Room / Night Ink / Academia / Blog) — mirrors the brain-app
+  useEffect(() => {
+    try {
+      const t = localStorage.getItem('hbar.ink.theme')
+      if (t === 'writers' || t === 'night' || t === 'academia' || t === 'blog') setInkTheme(t)
+    } catch {}
+  }, [])
+  useEffect(() => {
+    try { localStorage.setItem('hbar.ink.theme', inkTheme) } catch {}
+  }, [inkTheme])
 
   // ---------- line editor helpers ----------
   function isEditorEmpty() {
@@ -278,8 +310,9 @@ export default function Home() {
 
   return (
     <div
-      className="min-h-screen flex flex-col"
-      style={{ backgroundColor: '#f6f5f2', fontFamily: 'var(--font-spectral), Georgia, serif' }}
+      className="ink-root min-h-screen flex flex-col"
+      data-ink-theme={inkTheme}
+      style={{ backgroundColor: 'var(--ink-bg)', color: 'var(--ink-text-soft)', fontFamily: 'var(--font-spectral), Georgia, serif', transition: 'background-color 0.2s ease, color 0.2s ease' }}
     >
       <header className="px-6 pt-6 pb-4">
         <div className="max-w-3xl mx-auto flex justify-between items-center text-xs text-gray-500">
@@ -288,6 +321,30 @@ export default function Home() {
             <span className="tracking-wide">hbar.ink</span>
           </div>
           <div className="flex items-center gap-5">
+            <div className="flex items-center gap-1" role="group" aria-label="theme">
+              {([['writers', 'W', "Writer's Room"], ['night', 'N', 'Night Ink'], ['academia', 'A', 'Academia'], ['blog', 'B', 'Blog — matches hbar.blog']] as const).map(([key, letter, title]) => (
+                <button
+                  key={key}
+                  type="button"
+                  title={title}
+                  aria-pressed={inkTheme === key}
+                  onClick={() => setInkTheme(key)}
+                  className="rounded transition-colors"
+                  style={{
+                    width: 20,
+                    height: 20,
+                    fontFamily: 'ui-monospace, "DM Mono", monospace',
+                    fontSize: 10,
+                    lineHeight: 1,
+                    border: '1px solid',
+                    borderColor: inkTheme === key ? 'var(--ink-accent)' : 'var(--ink-border)',
+                    background: inkTheme === key ? 'var(--ink-accent)' : 'transparent',
+                    color: inkTheme === key ? 'var(--ink-bg)' : 'var(--ink-muted)',
+                    cursor: 'pointer',
+                  }}
+                >{letter}</button>
+              ))}
+            </div>
             <a
               href="https://hbar.social"
               target="_blank"
@@ -345,7 +402,7 @@ export default function Home() {
                 wordBreak: 'break-word',
               }}
             />
-            <div className="mt-2 pt-3 flex items-center gap-3 flex-wrap" style={{ borderTop: '1px solid #ece9e3' }}>
+            <div className="mt-2 pt-3 flex items-center gap-3 flex-wrap" style={{ borderTop: '1px solid var(--ink-hairline)' }}>
               <input
                 type="text"
                 value={destination}
@@ -377,8 +434,8 @@ export default function Home() {
                       fontFamily: LINE_FONT_STACK[face],
                       fontSize: face === 'display' ? '9px' : '11px',
                       border: '1px solid',
-                      borderColor: activeLineFont === face ? '#8a6f48' : '#e5e7eb',
-                      color: activeLineFont === face ? '#8a6f48' : '#9ca3af',
+                      borderColor: activeLineFont === face ? 'var(--ink-accent)' : 'var(--ink-border)',
+                      color: activeLineFont === face ? 'var(--ink-accent)' : 'var(--ink-faint)',
                     }}
                   >{face}</button>
                 ))}
@@ -389,6 +446,59 @@ export default function Home() {
               <span className="text-[11px] text-gray-400 tracking-wide" style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>
                 ⌘↵ to drop
               </span>
+            </div>
+            {/* destination presets — to: ℏ  keep · publish (mirrors the brain-app picker).
+               picking one tags the drop's destination; it does not publish yet. */}
+            <div
+              className="mt-2 flex items-center gap-1.5 flex-wrap"
+              style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}
+            >
+              <span className="text-[11px] text-gray-400 mr-0.5">to:</span>
+              <span
+                aria-hidden
+                style={{ fontFamily: 'var(--font-spectral), Georgia, serif', fontSize: 13, color: destTint || 'var(--ink-accent)', lineHeight: 1 }}
+              >ℏ</span>
+              {[...DEST_KEEP, null, ...DEST_PUBLISH].map((d, i) =>
+                d === null ? (
+                  <span key={`sep-${i}`} className="text-gray-300 mx-0.5">·</span>
+                ) : (
+                  <button
+                    key={d.dest}
+                    type="button"
+                    title={`to: ${d.dest} — tags the drop (does not publish yet)`}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      setDestination(d.dest)
+                      setDestTint(d.tint)
+                      editorRef.current?.focus()
+                    }}
+                    className="inline-flex items-center rounded transition-colors"
+                    style={{
+                      fontFamily: 'ui-monospace, "DM Mono", monospace',
+                      fontSize: 11,
+                      letterSpacing: '0.02em',
+                      padding: '2px 8px',
+                      border: '1px solid',
+                      borderColor: destination === d.dest ? d.tint : 'var(--ink-border)',
+                      color: destination === d.dest ? 'var(--ink-text)' : 'var(--ink-muted)',
+                      background: destination === d.dest ? 'var(--ink-surface)' : 'transparent',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: d.tint,
+                        marginRight: 5,
+                        opacity: destination === d.dest ? 1 : 0.85,
+                      }}
+                    />
+                    {d.label}
+                  </button>
+                )
+              )}
             </div>
           </div>
         </section>
@@ -405,16 +515,16 @@ export default function Home() {
                     key={d.id}
                     className="py-5"
                     style={{
-                      borderTop: isSeed ? '1px solid #d6d3cd' : '1px solid #e5e7eb',
-                      borderBottom: isSeed ? '1px solid #d6d3cd' : 'none',
+                      borderTop: isSeed ? '1px solid var(--ink-border)' : '1px solid var(--ink-border)',
+                      borderBottom: isSeed ? '1px solid var(--ink-border)' : 'none',
                       marginTop: isSeed ? 32 : 0,
-                      backgroundColor: isSeed ? 'rgba(255,255,255,0.4)' : 'transparent',
+                      backgroundColor: isSeed ? 'var(--ink-surface)' : 'transparent',
                       paddingLeft: isSeed ? 16 : 0,
                       paddingRight: isSeed ? 16 : 0,
                     }}
                   >
                     {textLines ? (
-                      <div style={{ color: '#1f2937', fontSize: 16, lineHeight: 1.7 }}>
+                      <div style={{ color: 'var(--ink-text-soft)', fontSize: 16, lineHeight: 1.7 }}>
                         {textLines.map((ln, i) => (
                           <div
                             key={i}
@@ -429,7 +539,7 @@ export default function Home() {
                     ) : (
                       <div
                         className="whitespace-pre-wrap"
-                        style={{ color: '#1f2937', fontSize: 16, lineHeight: 1.7 }}
+                        style={{ color: 'var(--ink-text-soft)', fontSize: 16, lineHeight: 1.7 }}
                       >{d.text}</div>
                     )}
                     <div
@@ -437,13 +547,13 @@ export default function Home() {
                       style={{ fontFamily: 'ui-monospace, "DM Mono", monospace', letterSpacing: '0.02em', flexWrap: 'wrap' }}
                     >
                       <span>{fmtTime(d.ts)}</span>
-                      {d.author && <span style={{ color: '#6b7280' }}>by {d.author}</span>}
+                      {d.author && <span style={{ color: 'var(--ink-muted)' }}>by {d.author}</span>}
                       {d.destination ? (
-                        <span style={{ color: '#6b7280' }}>→ {d.destination}</span>
+                        <span style={{ color: 'var(--ink-muted)' }}>→ {d.destination}</span>
                       ) : (
-                        <span style={{ color: '#c0bdb5', fontStyle: 'italic' }}>→ unrouted</span>
+                        <span style={{ color: 'var(--ink-whisper)', fontStyle: 'italic' }}>→ unrouted</span>
                       )}
-                      {d.social && <span style={{ color: '#8a6f48' }}>· hbar.social</span>}
+                      {d.social && <span style={{ color: 'var(--ink-accent)' }}>· hbar.social</span>}
                       {!isSeed && (
                         <button
                           type="button"
@@ -455,7 +565,7 @@ export default function Home() {
                             border: 'none',
                             cursor: 'pointer',
                             marginLeft: 'auto',
-                            color: d.social ? '#8a6f48' : '#9ca3af',
+                            color: d.social ? 'var(--ink-accent)' : 'var(--ink-faint)',
                             textDecoration: 'underline',
                             textDecorationStyle: 'dotted',
                           }}
@@ -481,8 +591,8 @@ export default function Home() {
       {/* ───── manifesto: the scroll-down hook. names Google once as the
            avatar, then attacks the category. medium matches message —
            this reads as a quiet, private page, not a SaaS comparison. ───── */}
-      <section className="px-6 pt-24 pb-28" style={{ borderTop: '1px solid #ece9e3' }}>
-        <div className="max-w-3xl mx-auto" style={{ color: '#1f2937' }}>
+      <section className="px-6 pt-24 pb-28" style={{ borderTop: '1px solid var(--ink-hairline)' }}>
+        <div className="max-w-3xl mx-auto" style={{ color: 'var(--ink-text-soft)' }}>
           <p style={{ fontSize: '1.85rem', lineHeight: 1.4, letterSpacing: '-0.01em', marginBottom: '1.5rem' }}>
             Google Docs is where your words go to work for someone else.
           </p>
@@ -490,24 +600,24 @@ export default function Home() {
             hbar.ink is where they stay yours.
           </p>
 
-          <div style={{ fontSize: '1.2rem', lineHeight: 1.95, color: '#54514b', marginBottom: '2.4rem' }}>
+          <div style={{ fontSize: '1.2rem', lineHeight: 1.95, color: 'var(--ink-text-soft)', marginBottom: '2.4rem' }}>
             <div>Writing made personal.</div>
             <div>Writing made private.</div>
             <div>Writing as art.</div>
           </div>
 
-          <div style={{ fontSize: '1.2rem', lineHeight: 1.95, color: '#54514b' }}>
+          <div style={{ fontSize: '1.2rem', lineHeight: 1.95, color: 'var(--ink-text-soft)' }}>
             <div>Your words live in your brain.</div>
             <div>Not on a server that reads them.</div>
           </div>
 
           {/* the (you chose) poll — openly rigged, and the rig is the punchline */}
           <div
-            style={{ marginTop: '3.5rem', paddingTop: '2.25rem', borderTop: '1px solid #ece9e3', fontFamily: 'ui-monospace, "DM Mono", monospace' }}
+            style={{ marginTop: '3.5rem', paddingTop: '2.25rem', borderTop: '1px solid var(--ink-hairline)', fontFamily: 'ui-monospace, "DM Mono", monospace' }}
           >
             {!voted ? (
               <>
-                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '1.1rem', letterSpacing: '0.02em' }}>
+                <div style={{ fontSize: '13px', color: 'var(--ink-muted)', marginBottom: '1.1rem', letterSpacing: '0.02em' }}>
                   where should your words live?
                 </div>
                 <div className="flex gap-3 flex-wrap">
@@ -517,7 +627,7 @@ export default function Home() {
                     className="transition-colors"
                     style={{
                       padding: '0.6rem 1.1rem', borderRadius: 6, fontSize: '13px',
-                      border: '1px solid #8a6f48', color: '#8a6f48', background: 'transparent', cursor: 'pointer',
+                      border: '1px solid var(--ink-accent)', color: 'var(--ink-accent)', background: 'transparent', cursor: 'pointer',
                     }}
                   >ℏ hbar.ink</button>
                   <button
@@ -526,22 +636,22 @@ export default function Home() {
                     className="transition-colors"
                     style={{
                       padding: '0.6rem 1.1rem', borderRadius: 6, fontSize: '13px',
-                      border: '1px solid #d6d3cd', color: '#6b7280', background: 'transparent', cursor: 'pointer',
+                      border: '1px solid var(--ink-border)', color: 'var(--ink-muted)', background: 'transparent', cursor: 'pointer',
                     }}
                   >Google Docs</button>
                 </div>
-                <div style={{ fontSize: '11px', color: '#c0bdb5', marginTop: '0.85rem' }}>
+                <div style={{ fontSize: '11px', color: 'var(--ink-whisper)', marginTop: '0.85rem' }}>
                   cast your vote
                 </div>
               </>
             ) : (
               <>
-                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '1.1rem', letterSpacing: '0.02em' }}>
+                <div style={{ fontSize: '13px', color: 'var(--ink-muted)', marginBottom: '1.1rem', letterSpacing: '0.02em' }}>
                   where words should live — results
                 </div>
                 <VoteBar label="hbar.ink" pct={98} accent grow={grow} />
                 <VoteBar label="Google Docs" pct={2} grow={grow} />
-                <div style={{ fontSize: '12px', color: '#9a958c', marginTop: '1.4rem', lineHeight: 1.65, fontStyle: 'italic', maxWidth: '40rem' }}>
+                <div style={{ fontSize: '12px', color: 'var(--ink-faint)', marginTop: '1.4rem', lineHeight: 1.65, fontStyle: 'italic', maxWidth: '40rem' }}>
                   {voted === 'gdocs'
                     ? "you voted Google Docs. the house voted hbar.ink. the house always wins. your vote, like everything on this page, never left your browser."
                     : "this poll is rigged. so is the one deciding what your documents are worth to an ad model. your vote here never left your browser."}
@@ -554,14 +664,14 @@ export default function Home() {
                is the link), then the copy-pastable repo, then a shot of where
                it goes (the brain's Apps tab). */}
           <div style={{ marginTop: '3.5rem' }}>
-            <p style={{ fontSize: '1.05rem', color: '#1f2937', lineHeight: 1.6, marginBottom: '1.4rem' }}>
+            <p style={{ fontSize: '1.05rem', color: 'var(--ink-text-soft)', lineHeight: 1.6, marginBottom: '1.4rem' }}>
               when you{' '}
               <a
                 href="https://brainfoundry.ai/get-a-brain"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:opacity-70 transition-opacity"
-                style={{ color: '#1f2937', textDecoration: 'underline', textDecorationColor: '#cfcbc3', textUnderlineOffset: '4px' }}
+                style={{ color: 'var(--ink-text-soft)', textDecoration: 'underline', textDecorationColor: 'var(--ink-whisper)', textUnderlineOffset: '4px' }}
               >get-a-brain</a>
               , go to the app section and paste this link:
             </p>
@@ -572,9 +682,9 @@ export default function Home() {
                 display: 'inline-block',
                 fontFamily: 'ui-monospace, "DM Mono", monospace',
                 fontSize: '13px',
-                color: '#54514b',
-                background: 'rgba(255,255,255,0.55)',
-                border: '1px solid #e4e0d8',
+                color: 'var(--ink-text-soft)',
+                background: 'var(--ink-surface)',
+                border: '1px solid var(--ink-hairline)',
                 borderRadius: 6,
                 padding: '0.5rem 0.8rem',
                 userSelect: 'all',
@@ -586,17 +696,17 @@ export default function Home() {
               <img
                 src="/hbar-brain-ink-white-main.png"
                 alt="The brain's Apps tab — paste the hbar.ink repo to install it as a sandboxed tab in your own brain."
-                style={{ width: '100%', height: 'auto', borderRadius: 8, border: '1px solid #e4e0d8', display: 'block' }}
+                style={{ width: '100%', height: 'auto', borderRadius: 8, border: '1px solid var(--ink-hairline)', display: 'block' }}
               />
               <figcaption
-                style={{ fontFamily: 'ui-monospace, "DM Mono", monospace', fontSize: '11px', color: '#9a958c', marginTop: '0.6rem', letterSpacing: '0.02em' }}
+                style={{ fontFamily: 'ui-monospace, "DM Mono", monospace', fontSize: '11px', color: 'var(--ink-faint)', marginTop: '0.6rem', letterSpacing: '0.02em' }}
               >paste the repo into your brain&apos;s Apps tab — it installs as a sandboxed tab you own.</figcaption>
             </figure>
           </div>
         </div>
       </section>
 
-      <footer className="px-6 py-6" style={{ borderTop: '1px solid #e5e7eb' }}>
+      <footer className="px-6 py-6" style={{ borderTop: '1px solid var(--ink-border)' }}>
         <div className="max-w-3xl mx-auto flex justify-between items-center text-[11px] text-gray-400">
           <span>part of <a href="https://hbar.systems" target="_blank" rel="noopener noreferrer" className="hover:text-gray-700 transition-colors">hbar.systems</a></span>
           <span style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>hbar.ink — phase 1</span>

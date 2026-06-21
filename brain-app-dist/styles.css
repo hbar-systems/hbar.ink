@@ -1,7 +1,9 @@
-/* hbar.ink — brain-app v0.8.
- * Three themes (Writer's Room / Night Ink / Academia), three font sizes,
+/* hbar.ink — brain-app v0.10.
+ * Four themes (Writer's Room / Night Ink / Academia / Blog), three font sizes,
  * Phase 1 typography. Lives in an iframe; the brain's nav surrounds it.
  * v0.8: per-line font faces (artistic-writing angle) — see --face-* below.
+ * v0.10: Blog theme (mirrors hbar.blog) + grouped, per-system-tinted
+ *        destinations (keep / publish / drop). See index.html presets row.
  */
 
 :root {
@@ -54,6 +56,23 @@ html.t-academia {
   --border:    #d8cdb6;
   --hairline:  #e3d9c3;
   --accent:    #7a3a2a;
+}
+
+/* Blog — mirrors hbar.blog: pure black, warm off-white text, gold accent,
+ * EB Garamond serif. --face-serif is overridden so the serif font picker
+ * reads like the blog; sans/mono pickers are untouched. */
+html.t-blog {
+  --bg:        #000000;
+  --surface:   rgba(232,230,227,0.04);
+  --text:      #e8e6e3;
+  --text-soft: #cfccc4;
+  --muted:     rgba(232,230,227,0.55);
+  --faint:     rgba(232,230,227,0.38);
+  --whisper:   rgba(232,230,227,0.20);
+  --border:    rgba(232,230,227,0.12);
+  --hairline:  rgba(232,230,227,0.07);
+  --accent:    #d4af37;
+  --face-serif: 'EB Garamond', 'Spectral', Georgia, 'Times New Roman', serif;
 }
 
 html.s-s { --size-base: 17px; --size-drop: 14px; }
@@ -203,6 +222,29 @@ body {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg);
+}
+
+/* hint strip shown only while Greek mode is on — explains the otherwise
+ * invisible typing remap (pressing αβ changes nothing until you type) */
+.ink-greek-hint {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+.ink-greek-hint[hidden] { display: none; }
+.ink-greek-hint b { color: var(--accent); font-weight: 600; }
+.ink-greek-hint .greek-dot {
+  font-family: var(--serif);
+  background: var(--accent);
+  color: var(--bg);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
 }
 
 .ink-info-panel {
@@ -421,6 +463,15 @@ body {
   margin-right: 2px;
 }
 .preset-sep { color: var(--whisper); margin: 0 4px; }
+/* ℏ — head of the destination row, in the active accent */
+.preset-hbar {
+  font-family: var(--serif);
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1;
+  margin: 0 3px 0 -1px;
+  transition: color 0.15s ease;
+}
 .preset {
   background: transparent;
   border: 1px solid var(--border);
@@ -440,6 +491,23 @@ body {
   color: var(--text);
   border-color: var(--accent);
 }
+/* per-destination signature shade — dot reads --ptint (set from data-tint in JS) */
+.preset[data-tint]::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ptint, var(--faint));
+  margin-right: 5px;
+  vertical-align: baseline;
+  opacity: 0.85;
+}
+.preset[data-tint]:hover::before,
+.preset[data-tint].active::before { opacity: 1; }
+/* file/link drop destinations — capability not live yet, dashed = honest */
+.preset-soon { border-style: dashed; opacity: 0.78; }
+.preset-soon:hover { opacity: 1; }
 
 /* ---------- pin button + sealed pin styling ---------- */
 .drop-pin {
@@ -470,7 +538,7 @@ body {
 /* ---------- focus mode ---------- */
 html.focus-on .ink-tagline,
 html.focus-on .ink-pickers,
-html.focus-on .ink-info,
+html.focus-on #info-toggle,
 html.focus-on .ink-counter,
 html.focus-on .ink-bf,
 html.focus-on .ink-info-panel,
@@ -480,6 +548,9 @@ html.focus-on .ink-drops,
 html.focus-on .ink-footer {
   display: none;
 }
+
+/* focus mode keeps the keyboards reachable: αβ (Greek typing) and ∑ (symbol
+ * palette) stay visible, and the palette itself shows when opened. */
 
 html.focus-on .ink-header { padding-bottom: 4px; }
 html.focus-on .ink-row { align-items: center; }
@@ -907,8 +978,8 @@ html.focus-on #drop-input {
   color: var(--muted);
 }
 
-/* keep the symbol layer out of the way in focus mode */
-html.focus-on .ink-palette { display: none; }
+/* focus mode keeps the symbol palette usable: when opened (∑) it shows even
+ * in focus; when closed it's hidden by .ink-palette[hidden] as usual. */
 
 /* ---------- export panel (sandbox-safe — no download, no popup) ---------- */
 .ink-export {

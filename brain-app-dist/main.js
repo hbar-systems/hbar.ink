@@ -679,12 +679,24 @@
   })
 
   // ---------- presets (destination + kind) ----------
+  // Picking a destination is single-select: it fills the field, marks the
+  // chosen preset active, and retints the accent to that system's signature
+  // shade (drop button, seal, badges, the ℏ head) — on top of the theme.
+  function applyDest(btn) {
+    els.destination.value = btn.dataset.dest
+    document.querySelectorAll('.preset[data-dest]').forEach(p => {
+      p.classList.toggle('active', p === btn)
+    })
+    const tint = btn.dataset.tint
+    if (tint) document.documentElement.style.setProperty('--accent', tint)
+    else document.documentElement.style.removeProperty('--accent')
+    els.input.focus()
+  }
   function bootPresets() {
     document.querySelectorAll('.preset[data-dest]').forEach(b => {
-      b.addEventListener('click', () => {
-        els.destination.value = b.dataset.dest
-        els.input.focus()
-      })
+      // dot color: single source of truth is data-tint on the button
+      if (b.dataset.tint) b.style.setProperty('--ptint', b.dataset.tint)
+      b.addEventListener('click', () => applyDest(b))
     })
     document.querySelectorAll('.preset[data-kind]').forEach(b => {
       b.addEventListener('click', () => {
@@ -932,7 +944,7 @@ ${dropsHtml}
 
   // ---------- theme + size + font pickers (document-level) ----------
   function applyTheme(themeClass) {
-    const all = ['t-writers-room', 't-night-ink', 't-academia']
+    const all = ['t-writers-room', 't-night-ink', 't-academia', 't-blog']
     document.documentElement.classList.remove(...all)
     document.documentElement.classList.add(themeClass)
     document.querySelectorAll('.ink-picker [data-theme]').forEach(b => {
@@ -975,7 +987,7 @@ ${dropsHtml}
     let font = 'f-serif'
     try {
       const t = localStorage.getItem(THEME_KEY)
-      if (t === 't-writers-room' || t === 't-night-ink' || t === 't-academia') theme = t
+      if (t === 't-writers-room' || t === 't-night-ink' || t === 't-academia' || t === 't-blog') theme = t
       const s = localStorage.getItem(SIZE_KEY)
       if (s === 's-s' || s === 's-m' || s === 's-l') size = s
       const f = localStorage.getItem(FONT_KEY)
@@ -1086,6 +1098,7 @@ ${dropsHtml}
     greekMode = on
     physEls.greekToggle.classList.toggle('active', on)
     physEls.greekToggle.setAttribute('aria-pressed', on ? 'true' : 'false')
+    if (physEls.greekHint) physEls.greekHint.hidden = !on
     if (paletteOpen && paletteLayout === 'keyboard') renderPaletteBoard()
   }
 
@@ -1354,6 +1367,7 @@ ${dropsHtml}
     if (!P) return // physics.js missing — degrade to plain ink
     physEls = {
       greekToggle: document.getElementById('greek-toggle'),
+      greekHint: document.getElementById('greek-hint'),
       paletteToggle: document.getElementById('palette-toggle'),
       palette: document.getElementById('palette'),
       paletteLayout: document.getElementById('palette-layout'),
