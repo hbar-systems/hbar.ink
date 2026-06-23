@@ -379,7 +379,7 @@
  * itself can't be swapped — this is the achievable, visible version.) */
 #ink-editor {
   caret-color: var(--ink-accent, #8a6f48);
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28"><text x="2" y="21" font-size="22" font-family="Georgia, serif" fill="%231f2937">ℏ</text></svg>') 5 21, text;
+  /* cursor inherits the site-wide themed ℏ (see .ink-root cursor rules) */
 }
 
 /* placeholder — the editor always holds one blank block, so JS toggles
@@ -469,3 +469,19 @@
 .ink-root .hover\:text-gray-800:hover { color: var(--ink-text); }
 .ink-root .hover\:text-gray-700:hover { color: var(--ink-text-soft); }
 .ink-root .placeholder\:text-gray-400::placeholder { color: var(--ink-faint); }
+
+/* signature ℏ mouse cursor across the whole page — colored per theme so it
+ * stays visible on dark backgrounds (Night Ink / Blog). Interactive elements
+ * (links, buttons, inputs) keep their own pointer/text cursor. */
+.ink-root {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28"><text x="2" y="21" font-size="22" font-family="Georgia, serif" fill="%238a6f48">ℏ</text></svg>') 5 21, auto;
+}
+.ink-root[data-ink-theme="night"] {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28"><text x="2" y="21" font-size="22" font-family="Georgia, serif" fill="%23c9a96e">ℏ</text></svg>') 5 21, auto;
+}
+.ink-root[data-ink-theme="academia"] {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28"><text x="2" y="21" font-size="22" font-family="Georgia, serif" fill="%237a3a2a">ℏ</text></svg>') 5 21, auto;
+}
+.ink-root[data-ink-theme="blog"] {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28"><text x="2" y="21" font-size="22" font-family="Georgia, serif" fill="%23d4af37">ℏ</text></svg>') 5 21, auto;
+}
