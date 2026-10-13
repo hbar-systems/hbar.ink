@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=EB+Garamond:wght@400;500&family=Audiowide&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.10.1">
+  <link rel="stylesheet" href="./styles.css?v=0.11.0">
 </head>
 <body>
   <header class="ink-header">
@@ -70,6 +70,11 @@
         <span class="greek-dot">αβ</span>
         Greek mode on — type letters for symbols (<b>a</b>→α, <b>p</b>→π, <b>l</b>→λ). Press <b>Esc</b> to exit, or ∑ for the full palette.
       </div>
+      <div class="ink-muse" id="muse" hidden aria-live="polite">
+        <span class="ink-muse-mark" aria-hidden="true">?</span>
+        <span class="ink-muse-q" id="muse-q"></span>
+        <button type="button" class="ink-muse-x" id="muse-x" title="let it go (Esc)">×</button>
+      </div>
       <div class="ink-instrument-row">
         <input
           id="destination"
@@ -79,6 +84,7 @@
           spellcheck="false"
         />
         <span id="status" class="ink-status"></span>
+        <button id="muse-btn" class="ink-muse-btn" type="button" title="the muse in the margin — one question about the thought in front of you (Cmd/Ctrl + J). It never writes into your drop.">muse</button>
         <button id="drop-btn" class="ink-drop-btn" type="button">drop</button>
       </div>
       <div class="ink-presets" id="presets">
@@ -191,6 +197,6 @@
   </div>
 
   <script src="./physics.js?v=0.9.1"></script>
-  <script src="./main.js?v=0.10.1"></script>
+  <script src="./main.js?v=0.11.0"></script>
 </body>
 </html>

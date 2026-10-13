@@ -1045,3 +1045,52 @@ html.focus-on #drop-input {
   font-size: 11px;
   color: var(--faint);
 }
+
+/* v0.11 — the muse in the margin. One faint question under the editor,
+ * on cue only. Read-only by design: nothing here can enter the drop. */
+.ink-muse {
+  margin-top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-left: 2px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: calc(var(--size-drop) - 1px);
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.ink-muse.shown { opacity: 1; }
+.ink-muse[hidden] { display: none; }
+.ink-muse.quiet .ink-muse-q { color: var(--faint); }
+.ink-muse-mark {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 11px;
+  color: var(--accent);
+}
+.ink-muse-q { flex: 1; line-height: 1.5; }
+.ink-muse-x {
+  background: transparent;
+  border: none;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.ink-muse-x:hover { color: var(--text); }
+.ink-muse-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.ink-muse-btn:hover { color: var(--accent); border-color: var(--border); }
+.ink-muse-btn[disabled] { opacity: 0.5; cursor: default; }

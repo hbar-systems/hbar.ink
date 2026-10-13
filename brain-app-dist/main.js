@@ -1,4 +1,4 @@
-// hbar.ink — brain-app v0.9.2.
+// hbar.ink — brain-app v0.11.0.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
 // destination, kind, ts, brainId?, pinned, sealedAt?, aiWeight, lineFonts? }.
@@ -23,8 +23,16 @@
 // v0.7 carried forward: sealing ceremony, search filter, export .md/.pdf,
 // document-level font/theme/size pickers.
 //
+// v0.11 — the muse in the margin (ops/ideas.md, 2026-06-24). Silent by
+//   default; on cue (Cmd/Ctrl+J or the `muse` button) the brain asks ONE
+//   question about the thought in front of you, via llm.complete. Rules:
+//   question-only (anything that is not a question is discarded, never
+//   shown), never inserted (the spark lives outside the editor and no code
+//   path writes it into the drop), and nothing goes out at ai 0%.
+//
 // Bridge usage:
 //   meta.app_info, meta.brain_info, memory.write — same as v0.6.
+//   llm.complete — the muse only, on the operator's cue.
 
 (() => {
   'use strict'
@@ -66,6 +74,10 @@
     exportClose: document.getElementById('ink-export-close'),
     exportCopy: document.getElementById('ink-export-copy'),
     exportNote: document.getElementById('ink-export-note'),
+    muse: document.getElementById('muse'),
+    museQ: document.getElementById('muse-q'),
+    museX: document.getElementById('muse-x'),
+    museBtn: document.getElementById('muse-btn'),
   }
 
   // session state
@@ -569,6 +581,7 @@
       return
     }
     clearEditor()
+    hideMuse()
     renderDrops()
     els.input.focus()
     placeCaret(els.input.firstChild, true)
@@ -643,7 +656,10 @@
     // 2. ink shortcuts — unchanged
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); commit(); return }
     if ((e.metaKey || e.ctrlKey) && e.key === '.') { e.preventDefault(); cycleLineFont(); return }
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'j' || e.key === 'J')) { e.preventDefault(); askMuse(); return }
     if (e.metaKey || e.ctrlKey) return
+    // the first Esc lets the muse's question go; the next one exits focus
+    if (e.key === 'Escape' && museShown()) { e.preventDefault(); e.stopPropagation(); hideMuse(); return }
     // 3. Esc turns Greek mode OFF — it never turns it on (that stays a real
     //    toggle), so Esc still falls through to ink's focus-mode exit.
     if (e.key === 'Escape' && greekMode) { e.preventDefault(); e.stopPropagation(); setGreekMode(false); return }
@@ -1448,6 +1464,98 @@ ${dropsHtml}
     els.input.addEventListener('mousedown', closeCompletion)
     window.addEventListener('scroll', () => { hideSymCard(); closeCompletion() }, true)
   }
+
+  // ---------- the muse in the margin ----------
+  // Brain-as-inspiration, not brain-as-assistant. One question, on cue,
+  // outside the editor. The voice is the product: provoke without
+  // overwriting, never pull the writer toward the mean.
+  const MUSE_SYSTEM =
+    "You are the muse in the margin of this person's private writing " +
+    "instrument. You are their own brain. They are mid-thought: mythology, " +
+    "stories, science, philosophy, material that is wild, deep or artistic. " +
+    "Your one job is to provoke, never to assist. Reply with exactly ONE " +
+    "question: one line, under 25 words, ending in a question mark, with " +
+    "nothing before it and nothing after it. Offer the strange door, not the " +
+    "obvious one. You may angle the question through one of their own past " +
+    "thoughts from your corpus, or through another domain (myth, physics, " +
+    "philosophy), but it must stay a question. Never answer, never advise, " +
+    "never summarise, never praise, never finish their sentence, never offer " +
+    "wording they could paste in. Do not flatten the writer: use their words " +
+    "and images, not generic ones. Ask in the language they write in."
+  const MUSE_MAX_INPUT = 4000
+  let museBusy = false
+  let museSeq = 0 // a newer cue or a drop makes an older reply stale
+
+  function museShown() { return !els.muse.hasAttribute('hidden') }
+
+  function showMuse(text, quiet) {
+    els.museQ.textContent = text
+    els.muse.classList.toggle('quiet', !!quiet)
+    els.muse.removeAttribute('hidden')
+    requestAnimationFrame(() => els.muse.classList.add('shown'))
+  }
+
+  function hideMuse() {
+    museSeq++
+    els.muse.classList.remove('shown')
+    els.muse.setAttribute('hidden', '')
+    els.museQ.textContent = ''
+  }
+
+  // Question-only gate. Keep the first sentence that ends in "?"; anything
+  // that is not a question (an answer, advice, a finished line) is dropped.
+  function toQuestion(raw) {
+    const flat = String(raw || '')
+      .replace(/\s+/g, ' ')
+      .replace(/^[\s"“'«*_-]+/, '')
+      .trim()
+    const m = flat.match(/[^?.!…]*\?/)
+    if (!m) return null
+    const q = m[0].replace(/^[\s"“'«*_-]+/, '').trim()
+    if (q.length < 6 || q.length > 240) return null
+    return q
+  }
+
+  async function askMuse() {
+    if (museBusy) return
+    if (window.parent === window) { showMuse('the muse lives in the brain; open hbar.ink inside it.', true); return }
+    const text = readEditorLines().map(l => l.text).join('\n').trim()
+    if (!text) { showMuse('write first; the muse asks about the thought in front of you.', true); return }
+    if (currentAiWeight === 0) { showMuse('the muse is off at ai 0%: this thought stays local.', true); return }
+    museBusy = true
+    const mine = ++museSeq
+    els.museBtn.disabled = true
+    showMuse('…', true)
+    let reply = null
+    try {
+      reply = await callBridge('llm.complete', {
+        messages: [
+          { role: 'system', content: MUSE_SYSTEM },
+          { role: 'user', content: 'The thought in front of them:\n\n' + text.slice(-MUSE_MAX_INPUT) },
+        ],
+        max_tokens: 256,
+      }, 90000)
+    } catch {
+      reply = null
+    }
+    museBusy = false
+    els.museBtn.disabled = false
+    if (mine !== museSeq) return // let go, or dropped, while it was thinking
+    if (!reply) { showMuse('the muse is out of reach (no brain answered).', true); return }
+    if (!reply.ok) {
+      const code = (reply.error && reply.error.code) || 'llm_complete_failed'
+      showMuse(code === 'permission_denied'
+        ? 'the muse needs llm.invoke: update hbar.ink in Apps and accept the new scope.'
+        : `the muse is quiet (${code}).`, true)
+      return
+    }
+    const q = toQuestion(reply.result && reply.result.text)
+    if (!q) { showMuse('the muse kept quiet.', true); return }
+    showMuse(q, false)
+  }
+
+  els.museBtn.addEventListener('click', () => { askMuse(); els.input.focus() })
+  els.museX.addEventListener('click', () => { hideMuse(); els.input.focus() })
 
   // ---------- boot ----------
   try { document.execCommand('defaultParagraphSeparator', false, 'div') } catch {}

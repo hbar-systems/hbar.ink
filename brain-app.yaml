@@ -10,8 +10,8 @@
 dialect: brain-app/v1
 id: hbar-ink
 name: hbar.ink
-version: 0.10.1
-description: Single-user thought-drop instrument. One job — absorb compressed thoughts fast. Includes a physicist symbol input layer (Greek, operators, bra-ket, equations).
+version: 0.11.0
+description: Single-user thought-drop instrument. Absorbs compressed thoughts fast. Physicist symbol layer (Greek, operators, bra-ket). The muse in the margin asks one question on cue (Cmd+J), never writes into your drop.
 license: AGPL-3.0
 
 author:
@@ -31,13 +31,19 @@ entries:
 
 permissions:
   - memory.write
+  - llm.invoke   # v0.11: the muse in the margin, on cue only
 
 requires_layers:
   - layer: episodic
     mode: append
+  - layer: episodic
+    mode: read
+  - layer: semantic
+    mode: read
 
 requires_endpoints:
   - POST /memory/append
+  - POST /chat/rag
 
 engines:
   brainfoundry-nous: ">=0.7.0"
