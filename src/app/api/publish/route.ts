@@ -268,6 +268,6 @@ export async function POST(req: NextRequest) {
     title: post.title,
     subtitle: post.subtitle,
     drops: cleanDrops.length,
-    url: `https://hbar.blog/essays/${slug}`,
+    url: `https://blog.hbar.systems/essays/${slug}`,
   })
 }

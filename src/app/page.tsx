@@ -346,7 +346,7 @@ export default function Home() {
               ))}
             </div>
             <a
-              href="https://hbar.social"
+              href="https://social.hbar.systems"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-gray-800 transition-colors"

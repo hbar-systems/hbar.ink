@@ -52,7 +52,7 @@ export default function Impressum() {
             <p>
               <strong className="text-gray-900">Governance and terms:</strong>{' '}
               <a
-                href="https://hbar.legal"
+                href="https://legal.hbar.systems"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline decoration-dotted hover:text-gray-900"
@@ -67,7 +67,7 @@ export default function Impressum() {
               in writing at the point of transaction. For governance, liability,
               disputes, and data handling see the canonical{' '}
               <a
-                href="https://hbar.legal"
+                href="https://legal.hbar.systems"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline decoration-dotted hover:text-gray-900"
