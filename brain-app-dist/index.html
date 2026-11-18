@@ -7,7 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=EB+Garamond:wght@400;500&family=Audiowide&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=0.11.0">
+  <link rel="stylesheet" href="./styles.css?v=0.12.0">
+  <link rel="stylesheet" href="./free-canvas.css?v=0.12.0">
 </head>
 <body>
   <header class="ink-header">
@@ -40,6 +41,10 @@
         </div>
         <button class="ink-info" id="greek-toggle" aria-pressed="false" title="Greek typing — when on, letters become symbols as you type (a→α, p→π). Esc exits.">αβ</button>
         <button class="ink-info" id="palette-toggle" aria-pressed="false" title="symbol palette — Greek, operators, equations">∑</button>
+        <span class="ink-picker ink-view" role="group" aria-label="view">
+          <button type="button" data-view="page" title="the page: write anywhere">page</button>
+          <button type="button" data-view="drops" title="the drop instrument and your sealed drops">drops</button>
+        </span>
         <button class="ink-focus" id="focus-toggle" title="focus mode (esc to exit)">focus</button>
         <button class="ink-info" id="info-toggle" title="what is this?">?</button>
         <span id="counter" class="ink-counter">0 today</span>
@@ -55,6 +60,15 @@
   </header>
 
   <main class="ink-main">
+    <section class="ink-section ink-page-wrap" id="ink-page" hidden aria-label="the page">
+      <div id="page-host"></div>
+      <div class="ink-page-bar">
+        <button type="button" class="ink-tool-btn" id="page-muse" title="the muse: one question about the words you are on (Cmd/Ctrl + J). It never writes into the page.">muse</button>
+        <button type="button" class="ink-drop-btn" id="page-drop" title="seal the fragment you are on into the brain, with the destination, kind and ai weight from the drops view">drop into brain</button>
+        <span class="ink-status" id="page-status"></span>
+        <span class="ink-page-legend">tap to write · drag to move · ⌘Z undo · ⌘. face · ⌘J muse</span>
+      </div>
+    </section>
     <section class="ink-section ink-instrument">
       <div
         id="drop-input"
@@ -197,6 +211,7 @@
   </div>
 
   <script src="./physics.js?v=0.9.1"></script>
-  <script src="./main.js?v=0.11.0"></script>
+  <script src="./free-canvas.js?v=0.12.0"></script>
+  <script src="./main.js?v=0.12.0"></script>
 </body>
 </html>

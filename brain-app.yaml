@@ -10,8 +10,8 @@
 dialect: brain-app/v1
 id: hbar-ink
 name: hbar.ink
-version: 0.11.0
-description: Single-user thought-drop instrument. Absorbs compressed thoughts fast. Physicist symbol layer (Greek, operators, bra-ket). The muse in the margin asks one question on cue (Cmd+J), never writes into your drop.
+version: 0.12.0
+description: Single-user writing instrument. Write anywhere on the page (tap, drag, edit in place, undo), then drop a fragment into the brain. Absorbs compressed thoughts fast. Physicist symbol layer (Greek, operators, bra-ket). The muse in the margin asks one question on cue (Cmd+J), never writes into your drop.
 license: AGPL-3.0
 
 author:

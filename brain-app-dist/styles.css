@@ -7,17 +7,20 @@
  */
 
 :root {
-  /* Default = Writer's Room */
-  --bg:        #f6f5f2;
-  --surface:   rgba(255,255,255,0.45);
-  --text:      #111827;
-  --text-soft: #1f2937;
-  --muted:     #6b7280;
-  --faint:     #9ca3af;
-  --whisper:   #c0bdb5;
-  --border:    #e5e7eb;
-  --hairline:  #ece9e3;
-  --accent:    #8a6f48;
+  /* Default = Writer's Room — warm since v0.12 (INK-MAGIC-1, 2026-11-18;
+     the cool grey v0.11 look is kept in v0.11/) */
+  --bg:        #f8f1e4;
+  --surface:   rgba(255,252,244,0.6);
+  --text:      #2b2116;
+  --text-soft: #3b2f22;
+  --muted:     #8a7860;
+  --faint:     #ad9c82;
+  --whisper:   #cdbd9f;
+  --border:    #e8dcc6;
+  --hairline:  #efe5d3;
+  --accent:    #b0673a;
+  --glow:      rgba(222,150,72,0.30);
+  --lift:      rgba(255,252,244,0.75);
   /* fixed faces — used for per-line font overrides, never reassigned */
   --face-serif:   'Spectral', Georgia, 'Times New Roman', serif;
   --face-sans:    'Inter', system-ui, -apple-system, sans-serif;
@@ -1094,3 +1097,27 @@ html.focus-on #drop-input {
 }
 .ink-muse-btn:hover { color: var(--accent); border-color: var(--border); }
 .ink-muse-btn[disabled] { opacity: 0.5; cursor: default; }
+
+
+/* ---------- v0.12 the page: write anywhere (INK-MAGIC-1, 2026-11-18) ---------- */
+html.t-night-ink { --glow: rgba(201,169,110,0.30); --lift: rgba(255,255,255,0.05); }
+html.t-academia  { --glow: rgba(160,90,50,0.22);   --lift: rgba(255,255,255,0.40); }
+html.t-blog      { --glow: rgba(212,175,55,0.28);  --lift: rgba(232,230,227,0.05); }
+.ink-page-wrap { padding: 0 20px 20px; }
+.ink-page-wrap > * { max-width: 1240px; }
+.ink-page-wrap .fc {
+  --ink-bg: var(--bg); --ink-text: var(--text); --ink-muted: var(--muted); --ink-whisper: var(--whisper);
+  --ink-accent: var(--accent); --ink-glow: var(--glow); --ink-lift: var(--lift);
+  --font-spectral: var(--face-serif); --font-montserrat: var(--face-sans); --font-audiowide: 'Audiowide';
+  min-height: calc(100vh - 150px);
+}
+.ink-page-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--hairline); }
+.ink-page-legend { margin-left: auto; font: 400 11px var(--face-mono); letter-spacing: .04em; color: var(--faint); }
+.ink-view button { min-width: 44px; }
+html.view-page .ink-instrument,
+html.view-page .ink-palette,
+html.view-page .ink-search-section,
+html.view-page .ink-drops,
+html.view-page .ink-tools,
+html.view-page #greek-toggle,
+html.view-page #palette-toggle { display: none !important; }

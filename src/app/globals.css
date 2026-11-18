@@ -485,3 +485,48 @@
 .ink-root[data-ink-theme="blog"] {
   cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28"><text x="2" y="21" font-size="22" font-family="Georgia, serif" fill="%23d4af37">ℏ</text></svg>') 5 21, auto;
 }
+
+/* ===========================================================================
+ * v0.12 write-anywhere page (INK-MAGIC-1, 2026-11-18). Scoped to .ink-page so
+ * the archived /v0.11 look keeps its own colours. Writer's Room turns warm:
+ * paper, morning light, one amber accent. */
+.ink-page[data-ink-theme="writers"] {
+  --ink-bg:        #f8f1e4;
+  --ink-surface:   rgba(255,252,244,0.6);
+  --ink-text:      #2b2116;
+  --ink-text-soft: #3b2f22;
+  --ink-muted:     #8a7860;
+  --ink-faint:     #ad9c82;
+  --ink-whisper:   #cdbd9f;
+  --ink-border:    #e8dcc6;
+  --ink-hairline:  #efe5d3;
+  --ink-accent:    #b0673a;
+  --ink-glow:      rgba(222,150,72,0.30);
+  --ink-lift:      rgba(255,252,244,0.75);
+}
+.ink-page[data-ink-theme="night"]    { --ink-glow: rgba(201,169,110,0.30); --ink-lift: rgba(255,255,255,0.05); }
+.ink-page[data-ink-theme="academia"] { --ink-glow: rgba(160,90,50,0.22);   --ink-lift: rgba(255,255,255,0.40); }
+.ink-page[data-ink-theme="blog"]     { --ink-glow: rgba(212,175,55,0.28);  --ink-lift: rgba(232,230,227,0.05); }
+.ink-page .ink-light {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(1200px 700px at 12% -10%, rgba(255,214,150,0.32), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgba(255,236,200,0.28), transparent 65%);
+  animation: ink-light 18s ease-in-out infinite alternate;
+}
+.ink-page[data-ink-theme="night"] .ink-light,
+.ink-page[data-ink-theme="blog"] .ink-light { opacity: .12; }
+@keyframes ink-light { from { opacity: .85; transform: translateY(0) } to { opacity: 1; transform: translateY(-12px) } }
+.ink-page .fc { cursor: inherit; }
+.ink-page .ink-legend {
+  font-family: ui-monospace, "DM Mono", monospace; font-size: 11px; letter-spacing: .04em;
+  color: var(--ink-faint); transition: opacity .8s ease;
+}
+.ink-page .ink-chip {
+  font-family: ui-monospace, "DM Mono", monospace; font-size: 11px; line-height: 1;
+  padding: 5px 9px; border-radius: 999px; border: 1px solid var(--ink-border);
+  color: var(--ink-muted); background: transparent; cursor: pointer;
+  transition: border-color .2s ease, color .2s ease, background-color .2s ease;
+}
+.ink-page .ink-chip:hover { border-color: var(--ink-accent); color: var(--ink-accent); }
+@media (prefers-reduced-motion: reduce) { .ink-page .ink-light { animation: none; } }

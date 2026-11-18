@@ -1,4 +1,8 @@
-// hbar.ink — brain-app v0.11.0.
+// hbar.ink — brain-app v0.12.0.
+//
+// v0.12 — the page (INK-MAGIC-1, 2026-11-18): write anywhere. A `page` view
+//   (free-canvas.js, shared with the site) beside the `drops` view. See the
+//   "the page" section near the end.
 //
 // Drop instrument inside a brain iframe. Each drop is { id, text,
 // destination, kind, ts, brainId?, pinned, sealedAt?, aiWeight, lineFonts? }.
@@ -1557,6 +1561,91 @@ ${dropsHtml}
   els.museBtn.addEventListener('click', () => { askMuse(); els.input.focus() })
   els.museX.addEventListener('click', () => { hideMuse(); els.input.focus() })
 
+
+  // ---------- v0.12 the page: write anywhere (INK-MAGIC-1, 2026-11-18) ----------
+  // The same canvas as the hbar.ink site (free-canvas.js). The page is for
+  // writing the way thought moves; `drop into brain` seals the fragment you are
+  // on through the same path as a drop (destination, kind, ai weight from the
+  // drops view). Drops stay exactly as they were, in the drops view.
+  // The muse here asks through the brain, with the same question-only gate.
+  const VIEW_KEY = 'hbar-ink-view'
+  const PAGE_KEY = 'hbar-ink-page-v1'
+  const pageEls = {
+    wrap: document.getElementById('ink-page'),
+    host: document.getElementById('page-host'),
+    drop: document.getElementById('page-drop'),
+    muse: document.getElementById('page-muse'),
+    status: document.getElementById('page-status'),
+    viewBtns: Array.from(document.querySelectorAll('.ink-view button')),
+  }
+  let page = null
+  let lastFrag = null
+
+  async function brainMuse(text) {
+    if (window.parent === window) return { quiet: 'the muse lives in the brain; open hbar.ink inside it.' }
+    if (currentAiWeight === 0) return { quiet: 'the muse is off at ai 0%: this page stays local.' }
+    let reply = null
+    try {
+      reply = await callBridge('llm.complete', {
+        messages: [
+          { role: 'system', content: MUSE_SYSTEM },
+          { role: 'user', content: 'The thought in front of them:\n\n' + String(text).slice(-MUSE_MAX_INPUT) },
+        ],
+        max_tokens: 256,
+      }, 90000)
+    } catch { reply = null }
+    if (!reply) return { quiet: 'the muse is out of reach (no brain answered).' }
+    if (!reply.ok) {
+      const code = (reply.error && reply.error.code) || 'llm_complete_failed'
+      return { quiet: code === 'permission_denied'
+        ? 'the muse needs llm.invoke: update hbar.ink in Apps and accept the new scope.'
+        : `the muse is quiet (${code}).` }
+    }
+    return toQuestion(reply.result && reply.result.text) // null → "the muse kept quiet."
+  }
+
+  function ensurePage() {
+    if (page || !window.FreeCanvas) return
+    page = window.FreeCanvas.create(pageEls.host, {
+      storageKey: PAGE_KEY,
+      hint: 'Write anywhere.',
+      hintSmall: 'Tap the page and begin.',
+      muse: brainMuse,
+    })
+    pageEls.host.addEventListener('focusin', () => { const f = page.focused(); if (f) lastFrag = f.id })
+  }
+
+  function setView(v) {
+    const isPage = v !== 'drops'
+    document.documentElement.classList.toggle('view-page', isPage)
+    if (isPage) pageEls.wrap.removeAttribute('hidden'); else pageEls.wrap.setAttribute('hidden', '')
+    pageEls.viewBtns.forEach(b => b.classList.toggle('active', b.dataset.view === (isPage ? 'page' : 'drops')))
+    try { localStorage.setItem(VIEW_KEY, isPage ? 'page' : 'drops') } catch {}
+    if (isPage) { ensurePage(); if (page) page.hideMuse() } else { if (page) page.hideMuse(); els.input.focus() }
+  }
+  pageEls.viewBtns.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)))
+
+  async function dropFragment() {
+    if (!page) return
+    const frags = page.fragments().filter(f => !f.locked && f.text.trim())
+    const f = page.focused() || frags.find(x => x.id === lastFrag) ||
+      frags.sort((a, b) => (a.ts < b.ts ? 1 : -1))[0]
+    if (!f || !f.text.trim()) { pageEls.status.textContent = 'write first, then drop'; setTimeout(() => { pageEls.status.textContent = '' }, 1800); return }
+    // through the one drop path: the editor takes the fragment's words, commit() seals them
+    els.input.textContent = ''
+    f.text.split('\n').forEach(line => { const d = document.createElement('div'); d.textContent = line; if (!line) d.appendChild(document.createElement('br')); els.input.appendChild(d) })
+    if (f.font && f.font !== 'serif') Array.from(els.input.children).forEach(d => { d.dataset.font = f.font })
+    await commit()
+    const latest = readDrops()[0]
+    page.update(f.id, { meta: Object.assign({}, f.meta, { droppedAt: new Date().toISOString(), dropId: latest && latest.id }) })
+  }
+  pageEls.drop.addEventListener('mousedown', e => e.preventDefault()) // keep the fragment focused
+  pageEls.drop.addEventListener('click', () => dropFragment())
+  pageEls.muse.addEventListener('mousedown', e => e.preventDefault())
+  pageEls.muse.addEventListener('click', () => { if (page) page.askMuse() })
+  // commit() reports into the drops view's status; mirror it on the page
+  new MutationObserver(() => { pageEls.status.textContent = els.status.textContent }).observe(els.status, { childList: true, characterData: true, subtree: true })
+
   // ---------- boot ----------
   try { document.execCommand('defaultParagraphSeparator', false, 'div') } catch {}
   clearEditor()
@@ -1572,4 +1661,7 @@ ${dropsHtml}
   loadHeaderMeta()
   els.input.focus()
   placeCaret(els.input.firstChild, true)
+  let startView = 'page'
+  try { startView = localStorage.getItem(VIEW_KEY) || 'page' } catch {}
+  setView(startView)
 })()

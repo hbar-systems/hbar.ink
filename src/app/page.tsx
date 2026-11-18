@@ -1,94 +1,49 @@
 'use client'
 
-import { useState, useEffect, useRef, KeyboardEvent } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import '../../brain-app-dist/free-canvas.css'
 
-// hbar.ink — public marketing page.
-// The page IS the instrument. One seeded drop from hbar (sealed, dated)
-// explains the tool in its own format. Visitors can drop their own thoughts;
-// drops live in localStorage only, ephemeral. The marketing IS the demo.
+// hbar.ink v0.12 — the write-anywhere page (INK-MAGIC-1, 2026-11-18).
+// hbar: "i want an ability for me to feel natural changing the words and being
+// able to write anywhere on the page. it should be magical free writing. the
+// surface should be positive."
 //
-// The drop input is a line editor: each line can carry its own font face
-// (serif / sans / mono / display) without changing the rest of the drop —
-// the "artistic writing" angle. Each drop can also be linked to hbar.social,
-// the brain-federation social surface.
+// The page IS the instrument: tap anywhere and a fragment starts there, drag to
+// move, every word editable in place, autosave, undo. The canvas is one shared
+// module (brain-app-dist/free-canvas.js) used here and in the brain-app.
+// Words live in this browser only (localStorage); nothing is sent anywhere.
+// The previous look is archived at /v0.11.
 
-interface Drop {
-  id: string
-  text: string
-  destination: string | null
-  ts: string
-  author?: string
-  seeded?: boolean
-  // per-line fonts, parallel to text.split('\n'); null = default face
-  lineFonts?: (string | null)[]
-  // linked to hbar.social (the brain-federation social feed)
-  social?: boolean
-}
+const PAGE_KEY = 'hbar.ink.page.v1'
+const OLD_DROPS_KEY = 'hbar.ink.demo.drops.v1' // read for migration, never deleted
 
-const STORAGE_KEY = 'hbar.ink.demo.drops.v1'
-const RECENT_LIMIT = 12
+const SEED_TEXT =
+  "you're reading this on hbar.ink — the public window. it's just a webpage.\n\n" +
+  "what you write here stays in your browser. nothing leaves it.\n\n" +
+  "i made this for myself: to write the way thinking actually moves, anywhere on the page, " +
+  "and to have a brain that remembers. the brain is the part you can't see — installed " +
+  "locally, owned by you, federated with mine when we agree.\n\n" +
+  "to keep your words: install hbar.ink into your brain."
 
-// per-line font faces. null = the default serif.
-const LINE_CYCLE: (string | null)[] = [null, 'serif', 'sans', 'mono', 'display']
-const LINE_FONT_STACK: Record<string, string> = {
-  serif: 'var(--font-spectral), Georgia, serif',
-  sans: 'var(--font-montserrat), system-ui, sans-serif',
-  mono: 'ui-monospace, "SF Mono", Menlo, monospace',
-  display: 'var(--font-audiowide), system-ui, sans-serif',
-}
-
-// destination presets — mirror the brain-app's `to: ℏ` picker.
-// "keep" = inward (becomes memory); "publish" = outward, text.
-// Each carries a signature shade shown as a dot. NOTE: picking one only
-// tags the drop's destination — it does not yet publish to that system.
-type DestPreset = { dest: string; label: string; tint: string }
-const DEST_KEEP: DestPreset[] = [
-  { dest: 'hbar.brain/episodic/', label: 'brain/ep', tint: '#6f8099' },
-  { dest: 'hbar.brain/semantic/', label: 'brain/sem', tint: '#7d8aa0' },
-  { dest: 'hbar.psychology/', label: 'psyche', tint: '#8a7aa3' },
-  { dest: 'hbar.mirror/', label: 'mirror', tint: '#6f9088' },
+// The muse on the public page is local: it asks about your own words, from a
+// small set of question shapes, and never writes into the page. Inside a brain,
+// the brain-app's muse asks through the brain's model instead.
+const STOP = new Set('that this with from have what when where which there their they them then than were been being would could should about into your yours just like only also very much more most some such even over under after before because while these those other again still here know think really thing things something nothing every never always'.split(' '))
+const SHAPES = [
+  (w: string) => `what does “${w}” hold that the sentence has not said yet?`,
+  (w: string) => `if “${w}” were the first word, what would come after it?`,
+  (w: string) => `who would read “${w}” differently than you mean it?`,
+  (w: string) => `what is the opposite of “${w}” here, and is it true too?`,
+  (w: string) => `where were you when “${w}” first came to you?`,
 ]
-const DEST_PUBLISH: DestPreset[] = [
-  { dest: 'hbar.blog/', label: 'blog', tint: '#d4af37' },
-  { dest: 'hbar.art/hbarnotes/', label: 'art', tint: '#bf5a93' },
-  { dest: 'hbar.science/', label: 'science', tint: '#3d9aa8' },
-  { dest: 'hbar.signals/', label: 'signals', tint: '#9a7bd0' },
-  { dest: 'hbar.social/', label: 'social', tint: '#4f93d6' },
-]
-
-const SEEDED_DROP: Drop = {
-  id: 'seed-2026-05-09-hbar-manifesto',
-  text:
-    "you're reading this on hbar.ink — the public window. it's just a webpage.\n\n" +
-    "drops you type here live in your browser memory and disappear when you close the tab.\n\n" +
-    "i made this for myself. to drop thoughts fast, route each one where it belongs, " +
-    "and have a brain that remembers. the brain is the part you can't see — installed " +
-    "locally, owned by you, federated with mine when we agree.\n\n" +
-    "to keep your thoughts: install hbar.ink into your brain.",
-  destination: 'hbar.systems/manifesto/',
-  ts: '2026-05-09T13:00:00Z',
-  author: 'hbar',
-  seeded: true,
-  // the closing line is set in display — the per-line font feature, shown.
-  lineFonts: [null, null, null, null, null, null, 'display'],
-  social: true,
-}
-
-function newId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
-}
-
-function fmtTime(iso: string) {
-  try {
-    const d = new Date(iso)
-    const now = new Date()
-    const sameDay = d.toDateString() === now.toDateString()
-    return sameDay
-      ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-  } catch {
-    return ''
-  }
+let museTurn = 0
+function localMuse(text: string): string {
+  const words = (text.toLowerCase().match(new RegExp("[\\p{L}][\\p{L}'’-]{3,}", 'gu')) || []).filter(w => !STOP.has(w))
+  museTurn++
+  if (!words.length) return 'what are you not writing yet?'
+  const near = words.slice(-5).sort((a, b) => b.length - a.length) // the weightiest of the last words
+  const w = near[museTurn % Math.min(2, near.length)]
+  return SHAPES[museTurn % SHAPES.length](w)
 }
 
 // One result bar in the (you chose) poll. The poll is rigged — that's the
@@ -118,19 +73,16 @@ function VoteBar({ label, pct, accent, grow }: { label: string; pct: number; acc
   )
 }
 
+type Theme = 'writers' | 'night' | 'academia' | 'blog'
+
 export default function Home() {
-  const [userDrops, setUserDrops] = useState<Drop[]>([])
-  const [destination, setDestination] = useState('')
-  const [destTint, setDestTint] = useState<string | null>(null)
-  const [inkTheme, setInkTheme] = useState<'writers' | 'night' | 'academia' | 'blog'>('writers')
-  const [loaded, setLoaded] = useState(false)
-  const [status, setStatus] = useState('')
-  const [activeLineFont, setActiveLineFont] = useState<string | null>(null)
+  const [inkTheme, setInkTheme] = useState<Theme>('writers')
   const [voted, setVoted] = useState<string | null>(null)
   const [grow, setGrow] = useState(false)
-  const editorRef = useRef<HTMLDivElement>(null)
+  const [touched, setTouched] = useState(false)
+  const hostRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<any>(null)
 
-  // instrument theme (Writer's Room / Night Ink / Academia / Blog) — mirrors the brain-app
   useEffect(() => {
     try {
       const t = localStorage.getItem('hbar.ink.theme')
@@ -141,186 +93,75 @@ export default function Home() {
     try { localStorage.setItem('hbar.ink.theme', inkTheme) } catch {}
   }, [inkTheme])
 
-  // ---------- line editor helpers ----------
-  function isEditorEmpty() {
-    const e = editorRef.current
-    return !e || (e.textContent || '').trim() === ''
-  }
-
-  function updatePlaceholder() {
-    const e = editorRef.current
-    if (e) e.classList.toggle('is-empty', isEditorEmpty())
-  }
-
-  function clearEditor() {
-    const e = editorRef.current
-    if (e) {
-      e.innerHTML = '<div><br></div>'
-      updatePlaceholder()
-    }
-  }
-
-  // Read the editor as ordered { text, font } lines.
-  function readEditorLines(): { text: string; font: string | null }[] {
-    const e = editorRef.current
-    if (!e) return [{ text: '', font: null }]
-    const lines: { text: string; font: string | null }[] = []
-    e.childNodes.forEach(node => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        lines.push({ text: node.textContent || '', font: null })
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        const el = node as HTMLElement
-        lines.push({ text: el.textContent || '', font: el.dataset.font || null })
-      }
-    })
-    return lines.length ? lines : [{ text: '', font: null }]
-  }
-
-  // The line block (direct child of the editor) holding a node.
-  function blockFromNode(node: Node | null): HTMLElement | null {
-    const e = editorRef.current
-    if (!e || !node) return null
-    let n: Node | null = node
-    while (n && n.parentNode && n.parentNode !== e) n = n.parentNode
-    if (!n || n.parentNode !== e) return null
-    if (n.nodeType === Node.TEXT_NODE) {
-      const div = document.createElement('div')
-      e.insertBefore(div, n)
-      div.appendChild(n)
-      return div
-    }
-    return n as HTMLElement
-  }
-
-  function currentBlock(): HTMLElement | null {
-    const e = editorRef.current
-    const sel = window.getSelection()
-    if (!e || !sel || sel.rangeCount === 0) return null
-    if (!e.contains(sel.anchorNode)) return null
-    return blockFromNode(sel.anchorNode)
-  }
-
-  function setLineFont(block: HTMLElement | null, font: string | null) {
-    if (!block) return
-    if (!font || block.dataset.font === font) {
-      delete block.dataset.font
-      setActiveLineFont(null)
-    } else {
-      block.dataset.font = font
-      setActiveLineFont(font)
-    }
-  }
-
-  function cycleLineFont() {
-    const block = currentBlock()
-    if (!block) return
-    const cur = block.dataset.font || null
-    const next = LINE_CYCLE[(LINE_CYCLE.indexOf(cur) + 1) % LINE_CYCLE.length]
-    setLineFont(block, next)
-  }
-
-  function trackLine() {
-    const block = currentBlock()
-    setActiveLineFont(block ? (block.dataset.font || null) : null)
-  }
-
-  // ---------- mount ----------
+  // mount the shared canvas (client only)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) setUserDrops(parsed)
-      }
-    } catch {}
-    setLoaded(true)
-    try { document.execCommand('defaultParagraphSeparator', false, 'div') } catch {}
-    clearEditor()
-    editorRef.current?.focus()
-    const onSel = () => trackLine()
-    document.addEventListener('selectionchange', onSel)
-    return () => document.removeEventListener('selectionchange', onSel)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false
+    let inst: any = null
+    import('../../brain-app-dist/free-canvas.js').then((mod: any) => {
+      if (cancelled || !hostRef.current) return
+      const FC = (mod && (mod.create ? mod : mod.default)) || (globalThis as any).FreeCanvas
+      const w = window.innerWidth
+      const narrow = w < 640
+      inst = FC.create(hostRef.current, {
+        storageKey: PAGE_KEY,
+        minHeight: Math.max(520, window.innerHeight - 90),
+        hint: 'Write anywhere.',
+        hintSmall: 'Tap the page and begin. Your words stay in this browser.',
+        migrate: () => {
+          const raw = localStorage.getItem(OLD_DROPS_KEY)
+          const old = raw ? JSON.parse(raw) : []
+          return Array.isArray(old) ? FC.fromDrops(old, w) : []
+        },
+        seed: [{
+          id: 'seed-2026-05-09-hbar-manifesto',
+          text: SEED_TEXT,
+          x: narrow ? 0.05 : 0.64,
+          y: Math.round(window.innerHeight * (narrow ? 0.66 : 0.6)),
+          locked: true,
+          by: 'hbar · may 2026',
+          ts: '2026-05-09T13:00:00Z',
+          from: 'seed',
+        }],
+        muse: async (text: string) => localMuse(text),
+        onChange: () => setTouched(true),
+      })
+      canvasRef.current = inst
+    })
+    return () => { cancelled = true; if (inst) inst.destroy(); canvasRef.current = null }
   }, [])
 
-  useEffect(() => {
-    if (!loaded) return
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(userDrops)) } catch {}
-  }, [userDrops, loaded])
-
-  // grow the rigged poll's bars in once a vote lands
   useEffect(() => {
     if (!voted) return
     const t = setTimeout(() => setGrow(true), 40)
     return () => clearTimeout(t)
   }, [voted])
 
-  const commit = () => {
-    const lines = readEditorLines()
-    while (lines.length > 1 && lines[0].text.trim() === '' && !lines[0].font) lines.shift()
-    while (lines.length > 1 && lines[lines.length - 1].text.trim() === '' && !lines[lines.length - 1].font) lines.pop()
-    const text = lines.map(l => l.text).join('\n')
-    if (!text.trim()) return
-    const lineFonts = lines.map(l => l.font || null)
-    const drop: Drop = {
-      id: newId(),
-      text,
-      destination: destination.trim() || null,
-      ts: new Date().toISOString(),
-      lineFonts: lineFonts.some(Boolean) ? lineFonts : undefined,
-    }
-    setUserDrops(prev => [drop, ...prev])
-    clearEditor()
-    setStatus('sealed (in this browser only)')
-    setTimeout(() => setStatus(''), 1600)
-    editorRef.current?.focus()
+  const exportMd = () => {
+    const inst = canvasRef.current
+    if (!inst) return
+    const frags = inst.fragments().filter((f: any) => !f.locked && f.text.trim())
+      .sort((a: any, b: any) => a.y - b.y || a.x - b.x)
+    const md = '# hbar.ink page\n\n' + frags.map((f: any) => f.text).join('\n\n---\n\n') + '\n'
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
+    a.download = 'hbar-ink-page-' + new Date().toISOString().slice(0, 10) + '.md'
+    document.body.appendChild(a); a.click(); a.remove()
   }
-
-  const remove = (id: string) => {
-    setUserDrops(prev => prev.filter(d => d.id !== id))
-  }
-
-  const toggleSocial = (id: string) => {
-    setUserDrops(prev => prev.map(d => d.id === id ? { ...d, social: !d.social } : d))
-  }
-
-  const handleKey = (e: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault()
-      commit()
-    }
-  }
-
-  const handleEditorKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault()
-      commit()
-      return
-    }
-    // Cmd/Ctrl + .  →  cycle the current line's font
-    if ((e.metaKey || e.ctrlKey) && e.key === '.') {
-      e.preventDefault()
-      cycleLineFont()
-    }
-  }
-
-  // Render order: user drops newest-first, seeded drop always at the bottom
-  // as the foundational reference.
-  const drops = [...userDrops, SEEDED_DROP].slice(0, RECENT_LIMIT)
 
   return (
     <div
-      className="ink-root min-h-screen flex flex-col"
+      className="ink-root ink-page min-h-screen flex flex-col"
       data-ink-theme={inkTheme}
-      style={{ backgroundColor: 'var(--ink-bg)', color: 'var(--ink-text-soft)', fontFamily: 'var(--font-spectral), Georgia, serif', transition: 'background-color 0.2s ease, color 0.2s ease' }}
+      style={{ backgroundColor: 'var(--ink-bg)', color: 'var(--ink-text-soft)', fontFamily: 'var(--font-spectral), Georgia, serif', transition: 'background-color 0.4s ease, color 0.4s ease', position: 'relative' }}
     >
-      <header className="px-6 pt-6 pb-4">
-        <div className="max-w-3xl mx-auto flex justify-between items-center text-xs text-gray-500">
+      <div className="ink-light" aria-hidden />
+      <header className="px-6 pt-6 pb-2" style={{ position: 'relative', zIndex: 2 }}>
+        <div className="mx-auto flex justify-between items-center text-xs text-gray-500 gap-4 flex-wrap" style={{ maxWidth: 1240 }}>
           <div className="flex items-center gap-2">
-            <span className="opacity-40">ℏ</span>
+            <span style={{ color: 'var(--ink-accent)', fontSize: 15 }}>ℏ</span>
             <span className="tracking-wide">hbar.ink</span>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-3 sm:gap-4">
             <div className="flex items-center gap-1" role="group" aria-label="theme">
               {([['writers', 'W', "Writer's Room"], ['night', 'N', 'Night Ink'], ['academia', 'A', 'Academia'], ['blog', 'B', 'Blog — matches hbar.blog']] as const).map(([key, letter, title]) => (
                 <button
@@ -329,269 +170,36 @@ export default function Home() {
                   title={title}
                   aria-pressed={inkTheme === key}
                   onClick={() => setInkTheme(key)}
-                  className="rounded transition-colors"
+                  className="transition-colors"
                   style={{
-                    width: 20,
-                    height: 20,
-                    fontFamily: 'ui-monospace, "DM Mono", monospace',
-                    fontSize: 10,
-                    lineHeight: 1,
-                    border: '1px solid',
-                    borderColor: inkTheme === key ? 'var(--ink-accent)' : 'var(--ink-border)',
+                    width: 20, height: 20, borderRadius: 999,
+                    fontFamily: 'ui-monospace, "DM Mono", monospace', fontSize: 10, lineHeight: 1,
+                    border: '1px solid', borderColor: inkTheme === key ? 'var(--ink-accent)' : 'var(--ink-border)',
                     background: inkTheme === key ? 'var(--ink-accent)' : 'transparent',
-                    color: inkTheme === key ? 'var(--ink-bg)' : 'var(--ink-muted)',
-                    cursor: 'pointer',
+                    color: inkTheme === key ? 'var(--ink-bg)' : 'var(--ink-muted)', cursor: 'pointer',
                   }}
                 >{letter}</button>
               ))}
             </div>
-            <a
-              href="https://social.hbar.systems"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-gray-800 transition-colors"
-            >hbar.social</a>
-            <a
-              href="https://github.com/hbar-systems/hbar.ink"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-gray-800 transition-colors"
-            >install</a>
-            <a
-              href="https://brainfoundry.ai"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-gray-800 transition-colors"
-              style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}
-            >{'{ get-a-brain }'}</a>
+            <button type="button" className="ink-chip" title="the muse: one question about the words you are on (⌘J). It never writes into your page." onMouseDown={e => { e.preventDefault(); canvasRef.current?.askMuse() }}>muse</button>
+            <button type="button" className="ink-chip" title="download this page as markdown" onClick={exportMd}>.md</button>
+            <a href="https://github.com/hbar-systems/hbar.ink" target="_blank" rel="noopener noreferrer" className="hidden sm:inline hover:text-gray-800 transition-colors">install</a>
+            <a href="https://brainfoundry.ai" target="_blank" rel="noopener noreferrer" className="hidden sm:inline hover:text-gray-800 transition-colors" style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>{'{ get-a-brain }'}</a>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col">
-        <section className="px-6 pt-10 pb-4">
-          <div className="max-w-3xl mx-auto">
-            <div
-              ref={editorRef}
-              id="ink-editor"
-              contentEditable
-              suppressContentEditableWarning
-              role="textbox"
-              aria-multiline="true"
-              aria-label="a thought"
-              data-placeholder="a thought."
-              spellCheck={false}
-              onInput={updatePlaceholder}
-              onKeyDown={handleEditorKey}
-              onKeyUp={trackLine}
-              onMouseUp={trackLine}
-              onFocus={trackLine}
-              onPaste={(e) => {
-                e.preventDefault()
-                const txt = e.clipboardData.getData('text/plain')
-                if (txt) document.execCommand('insertText', false, txt)
-              }}
-              className="w-full bg-transparent outline-none text-gray-900"
-              style={{
-                fontFamily: 'var(--font-spectral), Georgia, serif',
-                fontSize: '1.5rem',
-                lineHeight: 1.55,
-                letterSpacing: '-0.005em',
-                minHeight: '8.5rem',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
-            />
-            <div className="mt-2 pt-3 flex items-center gap-3 flex-wrap" style={{ borderTop: '1px solid var(--ink-hairline)' }}>
-              <input
-                type="text"
-                value={destination}
-                onChange={e => setDestination(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="to: hbar.brain/episodic/  (optional)"
-                spellCheck={false}
-                autoComplete="off"
-                className="flex-1 min-w-[180px] bg-transparent outline-none text-xs text-gray-600 placeholder:text-gray-400 placeholder:italic"
-                style={{ fontFamily: 'ui-monospace, "DM Mono", monospace', letterSpacing: '0.01em' }}
-              />
-              <div
-                className="flex items-center gap-1"
-                style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}
-              >
-                <span className="text-[11px] text-gray-400 mr-1">line:</span>
-                {(['serif', 'sans', 'mono', 'display'] as const).map(face => (
-                  <button
-                    key={face}
-                    type="button"
-                    title={`this line in ${face} — or press ⌘.`}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      setLineFont(currentBlock(), face)
-                      editorRef.current?.focus()
-                    }}
-                    className="px-1.5 py-0.5 rounded transition-colors"
-                    style={{
-                      fontFamily: LINE_FONT_STACK[face],
-                      fontSize: face === 'display' ? '9px' : '11px',
-                      border: '1px solid',
-                      borderColor: activeLineFont === face ? 'var(--ink-accent)' : 'var(--ink-border)',
-                      color: activeLineFont === face ? 'var(--ink-accent)' : 'var(--ink-faint)',
-                    }}
-                  >{face}</button>
-                ))}
-              </div>
-              <span className="text-[11px] text-gray-400 min-w-[40px] text-right" style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>
-                {status}
-              </span>
-              <span className="text-[11px] text-gray-400 tracking-wide" style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>
-                ⌘↵ to drop
-              </span>
-            </div>
-            {/* destination presets — to: ℏ  keep · publish (mirrors the brain-app picker).
-               picking one tags the drop's destination; it does not publish yet. */}
-            <div
-              className="mt-2 flex items-center gap-1.5 flex-wrap"
-              style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}
-            >
-              <span className="text-[11px] text-gray-400 mr-0.5">to:</span>
-              <span
-                aria-hidden
-                style={{ fontFamily: 'var(--font-spectral), Georgia, serif', fontSize: 13, color: destTint || 'var(--ink-accent)', lineHeight: 1 }}
-              >ℏ</span>
-              {[...DEST_KEEP, null, ...DEST_PUBLISH].map((d, i) =>
-                d === null ? (
-                  <span key={`sep-${i}`} className="text-gray-300 mx-0.5">·</span>
-                ) : (
-                  <button
-                    key={d.dest}
-                    type="button"
-                    title={`to: ${d.dest} — tags the drop (does not publish yet)`}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      setDestination(d.dest)
-                      setDestTint(d.tint)
-                      editorRef.current?.focus()
-                    }}
-                    className="inline-flex items-center rounded transition-colors"
-                    style={{
-                      fontFamily: 'ui-monospace, "DM Mono", monospace',
-                      fontSize: 11,
-                      letterSpacing: '0.02em',
-                      padding: '2px 8px',
-                      border: '1px solid',
-                      borderColor: destination === d.dest ? d.tint : 'var(--ink-border)',
-                      color: destination === d.dest ? 'var(--ink-text)' : 'var(--ink-muted)',
-                      background: destination === d.dest ? 'var(--ink-surface)' : 'transparent',
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: d.tint,
-                        marginRight: 5,
-                        opacity: destination === d.dest ? 1 : 0.85,
-                      }}
-                    />
-                    {d.label}
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="px-6 pb-16">
-          <div className="max-w-3xl mx-auto">
-            <ul className="m-0 p-0 list-none">
-              {drops.map(d => {
-                const isSeed = !!d.seeded
-                const fonts = d.lineFonts
-                const textLines = (fonts && fonts.some(Boolean)) ? d.text.split('\n') : null
-                return (
-                  <li
-                    key={d.id}
-                    className="py-5"
-                    style={{
-                      borderTop: isSeed ? '1px solid var(--ink-border)' : '1px solid var(--ink-border)',
-                      borderBottom: isSeed ? '1px solid var(--ink-border)' : 'none',
-                      marginTop: isSeed ? 32 : 0,
-                      backgroundColor: isSeed ? 'var(--ink-surface)' : 'transparent',
-                      paddingLeft: isSeed ? 16 : 0,
-                      paddingRight: isSeed ? 16 : 0,
-                    }}
-                  >
-                    {textLines ? (
-                      <div style={{ color: 'var(--ink-text-soft)', fontSize: 16, lineHeight: 1.7 }}>
-                        {textLines.map((ln, i) => (
-                          <div
-                            key={i}
-                            className="whitespace-pre-wrap"
-                            style={{
-                              fontFamily: fonts && fonts[i] ? LINE_FONT_STACK[fonts[i] as string] : undefined,
-                              minHeight: '1.7em',
-                            }}
-                          >{ln}</div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div
-                        className="whitespace-pre-wrap"
-                        style={{ color: 'var(--ink-text-soft)', fontSize: 16, lineHeight: 1.7 }}
-                      >{d.text}</div>
-                    )}
-                    <div
-                      className="mt-3 flex items-center gap-3 text-[11px] text-gray-400"
-                      style={{ fontFamily: 'ui-monospace, "DM Mono", monospace', letterSpacing: '0.02em', flexWrap: 'wrap' }}
-                    >
-                      <span>{fmtTime(d.ts)}</span>
-                      {d.author && <span style={{ color: 'var(--ink-muted)' }}>by {d.author}</span>}
-                      {d.destination ? (
-                        <span style={{ color: 'var(--ink-muted)' }}>→ {d.destination}</span>
-                      ) : (
-                        <span style={{ color: 'var(--ink-whisper)', fontStyle: 'italic' }}>→ unrouted</span>
-                      )}
-                      {d.social && <span style={{ color: 'var(--ink-accent)' }}>· hbar.social</span>}
-                      {!isSeed && (
-                        <button
-                          type="button"
-                          onClick={() => toggleSocial(d.id)}
-                          title="link this drop to hbar.social — the brain-federation social feed"
-                          className="transition-colors"
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            marginLeft: 'auto',
-                            color: d.social ? 'var(--ink-accent)' : 'var(--ink-faint)',
-                            textDecoration: 'underline',
-                            textDecorationStyle: 'dotted',
-                          }}
-                        >{d.social ? 'on hbar.social' : '→ social'}</button>
-                      )}
-                      {!isSeed && (
-                        <button
-                          type="button"
-                          onClick={() => remove(d.id)}
-                          className="hover:text-gray-700 transition-colors"
-                          style={{ background: 'transparent', border: 'none', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
-                        >delete</button>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        </section>
+      <main className="flex-1" style={{ position: 'relative', zIndex: 1 }}>
+        <div ref={hostRef} className="mx-auto" style={{ maxWidth: 1240, padding: '0 12px' }} />
+        <div className="mx-auto px-6 pb-6 ink-legend" style={{ maxWidth: 1240, opacity: touched ? 0.55 : 1 }}>
+          tap to write · drag to move · ⌘Z undo · ⌘. face · ⌘J muse
+        </div>
       </main>
 
       {/* ───── manifesto: the scroll-down hook. names Google once as the
            avatar, then attacks the category. medium matches message —
            this reads as a quiet, private page, not a SaaS comparison. ───── */}
-      <section className="px-6 pt-24 pb-28" style={{ borderTop: '1px solid var(--ink-hairline)' }}>
+      <section className="px-6 pt-24 pb-28" style={{ borderTop: '1px solid var(--ink-hairline)', position: 'relative', zIndex: 1 }}>
         <div className="max-w-3xl mx-auto" style={{ color: 'var(--ink-text-soft)' }}>
           <p style={{ fontSize: '1.85rem', lineHeight: 1.4, letterSpacing: '-0.01em', marginBottom: '1.5rem' }}>
             Google Docs is where your words go to work for someone else.
@@ -706,10 +314,10 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="px-6 py-6" style={{ borderTop: '1px solid var(--ink-border)' }}>
+      <footer className="px-6 py-6" style={{ borderTop: '1px solid var(--ink-border)', position: 'relative', zIndex: 1 }}>
         <div className="max-w-3xl mx-auto flex justify-between items-center text-[11px] text-gray-400">
           <span>part of <a href="https://hbar.systems" target="_blank" rel="noopener noreferrer" className="hover:text-gray-700 transition-colors">hbar.systems</a></span>
-          <span style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>hbar.ink — phase 1</span>
+          <span style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>hbar.ink v0.12 · <a href="/v0.11" className="hover:text-gray-700 transition-colors">v0.11</a></span>
         </div>
       </footer>
     </div>
