@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en" class="t-writers-room s-m f-serif">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hbar.ink</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&family=EB+Garamond:wght@400;500&family=Audiowide&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=0.12.0">
+  <link rel="stylesheet" href="./free-canvas.css?v=0.12.0">
+</head>
+<body>
+  <header class="ink-header">
+    <div class="ink-row">
+      <div class="ink-brand-block">
+        <div class="ink-brand">
+          <span class="ink-glyph">ℏ</span>
+          <span class="ink-name">hbar.ink</span>
+        </div>
+        <span class="ink-tagline">a single-user thought-drop instrument</span>
+      </div>
+      <div class="ink-meta">
+        <div class="ink-pickers">
+          <div class="ink-picker" role="group" aria-label="theme">
+            <button data-theme="t-writers-room" title="Writer's Room">W</button>
+            <button data-theme="t-night-ink" title="Night Ink">N</button>
+            <button data-theme="t-academia" title="Academia">A</button>
+            <button data-theme="t-blog" title="Blog — matches hbar.blog">B</button>
+          </div>
+          <div class="ink-picker" role="group" aria-label="font family">
+            <button data-font="f-serif" title="Spectral (serif)">Aa</button>
+            <button data-font="f-sans" title="Inter (sans)">aA</button>
+            <button data-font="f-mono" title="DM Mono">{}</button>
+          </div>
+          <div class="ink-picker" role="group" aria-label="font size">
+            <button data-size="s-s" title="small">S</button>
+            <button data-size="s-m" title="medium">M</button>
+            <button data-size="s-l" title="large">L</button>
+          </div>
+        </div>
+        <button class="ink-info" id="greek-toggle" aria-pressed="false" title="Greek typing — when on, letters become symbols as you type (a→α, p→π). Esc exits.">αβ</button>
+        <button class="ink-info" id="palette-toggle" aria-pressed="false" title="symbol palette — Greek, operators, equations">∑</button>
+        <span class="ink-picker ink-view" role="group" aria-label="view">
+          <button type="button" data-view="page" title="the page: write anywhere">page</button>
+          <button type="button" data-view="drops" title="the drop instrument and your sealed drops">drops</button>
+        </span>
+        <button class="ink-focus" id="focus-toggle" title="focus mode (esc to exit)">focus</button>
+        <button class="ink-info" id="info-toggle" title="what is this?">?</button>
+        <span id="counter" class="ink-counter">0 today</span>
+        <span id="bf-meta" class="ink-bf"></span>
+      </div>
+    </div>
+    <div class="ink-info-panel" id="info-panel" hidden>
+      hbar.ink is a single-user thought-drop instrument.
+      type a thought, hit <b>drop</b>, and it routes into your brain's
+      episodic memory — the brain remembers, you can ask it later in chat.
+      part of <a href="https://hbar.systems" target="_blank" rel="noopener noreferrer">hbar.systems</a>.
+    </div>
+  </header>
+
+  <main class="ink-main">
+    <section class="ink-section ink-page-wrap" id="ink-page" hidden aria-label="the page">
+      <div id="page-host"></div>
+      <div class="ink-page-bar">
+        <button type="button" class="ink-tool-btn" id="page-muse" title="the muse: one question about the words you are on (Cmd/Ctrl + J). It never writes into the page.">muse</button>
+        <button type="button" class="ink-drop-btn" id="page-drop" title="seal the fragment you are on into the brain, with the destination, kind and ai weight from the drops view">drop into brain</button>
+        <span class="ink-status" id="page-status"></span>
+        <span class="ink-page-legend">tap to write · drag to move · ⌘Z undo · ⌘. face · ⌘J muse</span>
+      </div>
+    </section>
+    <section class="ink-section ink-instrument">
+      <div
+        id="drop-input"
+        class="ink-editor"
+        contenteditable="true"
+        role="textbox"
+        aria-multiline="true"
+        aria-label="a thought"
+        spellcheck="false"
+        data-placeholder="a thought."
+      ></div>
+      <div class="ink-greek-hint" id="greek-hint" hidden>
+        <span class="greek-dot">αβ</span>
+        Greek mode on — type letters for symbols (<b>a</b>→α, <b>p</b>→π, <b>l</b>→λ). Press <b>Esc</b> to exit, or ∑ for the full palette.
+      </div>
+      <div class="ink-muse" id="muse" hidden aria-live="polite">
+        <span class="ink-muse-mark" aria-hidden="true">?</span>
+        <span class="ink-muse-q" id="muse-q"></span>
+        <button type="button" class="ink-muse-x" id="muse-x" title="let it go (Esc)">×</button>
+      </div>
+      <div class="ink-instrument-row">
+        <input
+          id="destination"
+          type="text"
+          placeholder="to: hbar.brain/episodic/  (optional)"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <span id="status" class="ink-status"></span>
+        <button id="muse-btn" class="ink-muse-btn" type="button" title="the muse in the margin — one question about the thought in front of you (Cmd/Ctrl + J). It never writes into your drop.">muse</button>
+        <button id="drop-btn" class="ink-drop-btn" type="button">drop</button>
+      </div>
+      <div class="ink-presets" id="presets">
+        <span class="preset-label">to:</span>
+        <span class="preset-hbar" aria-hidden="true">ℏ</span>
+        <button class="preset" data-dest="hbar.brain/episodic/" data-tint="#6f8099">brain/ep</button>
+        <button class="preset" data-dest="hbar.brain/semantic/" data-tint="#7d8aa0">brain/sem</button>
+        <button class="preset" data-dest="hbar.psychology/" data-tint="#8a7aa3">psyche</button>
+        <button class="preset" data-dest="hbar.mirror/" data-tint="#6f9088">mirror</button>
+        <span class="preset-sep" title="published — outward, text">·</span>
+        <button class="preset" data-dest="hbar.blog/" data-tint="#d4af37">blog</button>
+        <button class="preset" data-dest="hbar.art/hbarnotes/" data-tint="#bf5a93">art</button>
+        <button class="preset" data-dest="hbar.science/" data-tint="#3d9aa8">science</button>
+        <button class="preset" data-dest="hbar.signals/" data-tint="#9a7bd0">signals</button>
+        <button class="preset" data-dest="hbar.social/" data-tint="#4f93d6">social</button>
+        <span class="preset-sep">·</span>
+        <span class="preset-label">ai:</span>
+        <input
+          type="range"
+          id="ai-weight"
+          class="ink-ai-slider"
+          min="0"
+          max="100"
+          step="5"
+          value="50"
+          aria-label="how much the brain may lean on this drop"
+          title="how much the brain may lean on this drop in chat — 0% keeps it local only"
+        />
+        <span id="ai-weight-value" class="ink-ai-value">50%</span>
+      </div>
+      <div class="ink-presets">
+        <span class="preset-label">kind:</span>
+        <button class="preset preset-kind" data-kind="note">note</button>
+        <button class="preset preset-kind" data-kind="essay">essay</button>
+        <button class="preset preset-kind" data-kind="plan">plan</button>
+        <button class="preset preset-kind" data-kind="log">log</button>
+        <button class="preset preset-kind" data-kind="prompt">prompt</button>
+        <span class="preset-sep">·</span>
+        <span class="preset-label" title="put the cursor in a line, then pick a face — or press Cmd/Ctrl + .">line:</span>
+        <button class="preset preset-line" data-linefont="serif" title="this line in serif">serif</button>
+        <button class="preset preset-line" data-linefont="sans" title="this line in sans">sans</button>
+        <button class="preset preset-line" data-linefont="mono" title="this line in mono">mono</button>
+        <button class="preset preset-line" data-linefont="display" title="this line in display">display</button>
+      </div>
+    </section>
+
+    <section class="ink-section ink-palette" id="palette" aria-label="symbol palette" hidden>
+      <div class="ink-palette-bar">
+        <span class="seg" id="palette-layout" role="group" aria-label="palette layout">
+          <button type="button" data-layout="category" class="on">category</button>
+          <button type="button" data-layout="keyboard">keyboard</button>
+        </span>
+        <button type="button" class="ink-tool-btn" id="desc-toggle" aria-pressed="false">descriptions: off</button>
+        <span class="ink-palette-hint">click a symbol to drop it at the cursor · type \name in the editor for inline completion</span>
+      </div>
+      <div id="palette-board" class="ink-palette-board"></div>
+    </section>
+
+    <section class="ink-section ink-search-section" aria-label="filter drops">
+      <div class="ink-search-row">
+        <input
+          id="search"
+          type="text"
+          placeholder="search drops…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <span id="search-count" class="ink-search-count"></span>
+      </div>
+    </section>
+
+    <section class="ink-section ink-drops" aria-label="recent drops">
+      <ul id="drops" class="ink-list"></ul>
+    </section>
+  </main>
+
+  <footer class="ink-footer">
+    <div class="ink-footer-row">
+      <div class="ink-tools">
+        <span class="ink-tools-label">tools</span>
+        <button id="export-md" class="ink-tool-btn" title="download all drops as a single markdown file">export .md</button>
+        <button id="export-pdf" class="ink-tool-btn" title="open a printable view; use your browser's Save as PDF">export .pdf</button>
+      </div>
+      <div class="ink-stats" id="stats">—</div>
+    </div>
+    <div class="ink-footer-row">
+      <span class="ink-footer-faint">drops are yours. local browser + your brain. no third party.</span>
+      <span class="ink-footer-links">
+        <a class="ink-footer-link" href="https://hbar.social" target="_blank" rel="noopener noreferrer">hbar.social</a>
+        <a class="ink-footer-link" href="https://hbar.systems" target="_blank" rel="noopener noreferrer">hbar.systems</a>
+      </span>
+    </div>
+  </footer>
+
+  <div id="ink-complete" class="ink-complete" role="listbox" aria-label="symbol completions" hidden></div>
+  <div id="ink-symcard" class="ink-symcard"></div>
+
+  <div id="ink-export" class="ink-export" hidden>
+    <div class="ink-export-panel">
+      <div class="ink-export-head">
+        <span class="ink-export-title">export — copy this to keep it</span>
+        <button type="button" id="ink-export-close" class="ink-tool-btn">close</button>
+      </div>
+      <textarea id="ink-export-text" class="ink-export-text" readonly spellcheck="false"></textarea>
+      <div class="ink-export-actions">
+        <button type="button" id="ink-export-copy" class="ink-tool-btn">copy</button>
+        <span id="ink-export-note" class="ink-export-note"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="./physics.js?v=0.9.1"></script>
+  <script src="./free-canvas.js?v=0.12.0"></script>
+  <script src="./main.js?v=0.12.0"></script>
+</body>
+</html>

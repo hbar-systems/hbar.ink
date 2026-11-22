@@ -1,4 +1,10 @@
-// hbar.ink — brain-app v0.12.0.
+// hbar.ink — brain-app v0.13.0.
+//
+// v0.13 — the quill (INK-APP-1, 2026-11-22): the page view edits like hbar.ink
+// v0.13 (select words, the Aa handle, or Cmd/Ctrl+E: bold, italic, highlight,
+// cross out, headings, lists, checks, quote, indent, font-shape slider). A
+// fragment dropped into the brain goes as markdown (metadata.format), the
+// local drop keeps the plain words. The v0.12 app is kept at ./v0.12/.
 //
 // v0.12 — the page (INK-MAGIC-1, 2026-11-18): write anywhere. A `page` view
 //   (free-canvas.js, shared with the site) beside the `drops` view. See the
@@ -566,7 +572,11 @@
   }
 
   // ---------- input handling ----------
-  async function commit() {
+  // opts.markdown (v0.13, INK-APP-1): the page's fragment with its formatting.
+  // The drop keeps the plain words in drop.text (the drops view, search, export);
+  // the brain gets the markdown, which still reads as plain words.
+  async function commit(opts) {
+    const md = opts && typeof opts.markdown === 'string' ? opts.markdown.trim() : ''
     const lines = readEditorLines()
     // drop blank lines at the head and tail — they carry no thought.
     while (lines.length > 1 && lines[0].text.trim() === '' && !lines[0].font) lines.shift()
@@ -584,6 +594,11 @@
       els.status.textContent = ''
       return
     }
+    if (md && md !== text.trim()) {
+      drop.markdown = md
+      const all = readDrops(); const i = all.findIndex(d => d.id === drop.id)
+      if (i >= 0) { all[i].markdown = md; writeDrops(all) }
+    }
     clearEditor()
     hideMuse()
     renderDrops()
@@ -600,10 +615,11 @@
     try {
       const reply = await callBridge('memory.write', {
         layer: 'episodic',
-        content: drop.text,
+        content: drop.markdown || drop.text,
         source: 'hbar-ink',
         metadata: {
           drop_id: drop.id,
+          format: drop.markdown ? 'markdown' : 'plain',
           destination: drop.destination,
           kind: drop.kind,
           ai_weight: drop.aiWeight,
@@ -1611,6 +1627,7 @@ ${dropsHtml}
       hint: 'Write anywhere.',
       hintSmall: 'Tap the page and begin.',
       muse: brainMuse,
+      edit: true, // v0.13 (INK-APP-1): the quill, same as hbar.ink
     })
     pageEls.host.addEventListener('focusin', () => { const f = page.focused(); if (f) lastFrag = f.id })
   }
@@ -1635,7 +1652,9 @@ ${dropsHtml}
     els.input.textContent = ''
     f.text.split('\n').forEach(line => { const d = document.createElement('div'); d.textContent = line; if (!line) d.appendChild(document.createElement('br')); els.input.appendChild(d) })
     if (f.font && f.font !== 'serif') Array.from(els.input.children).forEach(d => { d.dataset.font = f.font })
-    await commit()
+    let md = ''
+    try { md = page.markdown(f.id) || '' } catch {}
+    await commit({ markdown: md })
     const latest = readDrops()[0]
     page.update(f.id, { meta: Object.assign({}, f.meta, { droppedAt: new Date().toISOString(), dropId: latest && latest.id }) })
   }

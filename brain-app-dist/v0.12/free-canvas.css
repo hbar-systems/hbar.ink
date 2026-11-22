@@ -1,0 +1,128 @@
+/* free-canvas.css — the write-anywhere page. Created 2026-11-18 (INK-MAGIC-1).
+   Shared by the hbar.ink site and the brain-app. Colours come from the host's
+   --ink-* variables when present, else a warm paper default. */
+
+.fc {
+  --fc-paper: var(--ink-bg, #f7f0e3);
+  --fc-ink: var(--ink-text, #2b2116);
+  --fc-soft: var(--ink-muted, #8a7a63);
+  --fc-faint: var(--ink-whisper, #c9b89a);
+  --fc-accent: var(--ink-accent, #b0673a);
+  --fc-glow: var(--ink-glow, rgba(214, 150, 70, 0.28));
+  --fc-lift: var(--ink-lift, rgba(255, 252, 244, 0.72));
+  --fc-serif: var(--font-spectral, 'Spectral'), 'Iowan Old Style', Georgia, serif;
+  --fc-sans: var(--font-montserrat, 'Inter'), system-ui, sans-serif;
+  --fc-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --fc-display: var(--font-audiowide, 'Audiowide'), system-ui, sans-serif;
+  --fc-ease: cubic-bezier(.2, .75, .2, 1);
+  position: relative;
+  min-height: 70vh;
+  cursor: text;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fc-hint {
+  position: absolute; left: 0; right: 0; top: 22vh;
+  text-align: center; pointer-events: none;
+  transition: opacity .9s var(--fc-ease), transform .9s var(--fc-ease);
+}
+.fc-hint.away { opacity: 0; transform: translateY(-6px); }
+.fc-hint-big {
+  display: block; font: 300 clamp(30px, 5vw, 46px)/1.2 var(--fc-serif);
+  color: var(--fc-soft); letter-spacing: -0.01em;
+  animation: fc-breathe 6s ease-in-out infinite;
+}
+.fc-hint-small { display: block; margin-top: 12px; font: 400 14px/1.4 var(--fc-serif); font-style: italic; color: var(--fc-faint); }
+@keyframes fc-breathe { 0%, 100% { opacity: .78 } 50% { opacity: 1 } }
+
+.fc-frag {
+  position: absolute;
+  max-width: min(36ch, calc(100% - 28px));
+  min-width: 2.2em;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: grab;
+  touch-action: none;
+  transition: background-color .25s ease, box-shadow .3s ease, opacity .4s ease, transform .35s var(--fc-ease), top .45s var(--fc-ease);
+}
+.fc-frag:hover { background: var(--fc-lift); }
+.fc-frag.edit { cursor: text; background: var(--fc-lift); box-shadow: 0 1px 0 var(--fc-glow); }
+.fc-frag.drag {
+  cursor: grabbing; z-index: 9; transition: none;
+  background: var(--fc-lift);
+  box-shadow: 0 14px 34px rgba(80, 50, 20, .14);
+  transform: rotate(-0.6deg) scale(1.015);
+}
+.fc-frag.settle { animation: fc-settle .55s var(--fc-ease); }
+@keyframes fc-settle { 0% { transform: scale(1.015) } 55% { transform: scale(.996) } 100% { transform: none } }
+.fc-frag.gone { opacity: 0; transform: translateY(-4px) scale(.98); pointer-events: none; }
+.fc-frag.arrive { animation: fc-arrive 1.1s var(--fc-ease) both; animation-delay: calc(var(--i, 0) * 70ms); }
+@keyframes fc-arrive { from { opacity: 0; transform: translateY(10px); filter: blur(2px) } to { opacity: 1; transform: none; filter: none } }
+.fc-frag.fresh { animation: fc-fresh .5s var(--fc-ease); }
+@keyframes fc-fresh { from { opacity: 0; transform: translateY(3px) } to { opacity: 1; transform: none } }
+
+.fc-txt {
+  font: 400 21px/1.5 var(--fc-serif);
+  color: var(--fc-ink);
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 1.5em;
+  cursor: inherit;
+  caret-color: var(--fc-accent);
+  user-select: text; -webkit-user-select: text;
+  transition: text-shadow 1.1s ease, color 1.1s ease;
+}
+.fc-frag:not(.edit) .fc-txt { user-select: none; -webkit-user-select: none; }
+.fc-frag.edit .fc-txt { cursor: text; }
+/* fresh ink: a warm bloom while the hand moves; settles when it rests */
+.fc-frag.wet .fc-txt { text-shadow: 0 0 9px var(--fc-glow); transition: text-shadow .12s ease; }
+.fc-frag.face-sans .fc-txt { font-family: var(--fc-sans); font-size: 18px; }
+.fc-frag.face-mono .fc-txt { font-family: var(--fc-mono); font-size: 16px; }
+.fc-frag.face-display .fc-txt { font-family: var(--fc-display); font-size: 17px; letter-spacing: .02em; }
+.fc-frag.locked { cursor: grab; }
+.fc-frag.locked { max-width: min(34ch, calc(100% - 28px)); }
+.fc-frag.locked .fc-txt { font-size: 15px; line-height: 1.6; color: var(--fc-soft); }
+.fc-by { display: block; margin-top: 6px; font: 400 11px var(--fc-mono); letter-spacing: .06em; color: var(--fc-faint); }
+
+/* a drop of ink where the page is touched */
+.fc-drop {
+  position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
+  background: var(--fc-accent); opacity: .4; pointer-events: none;
+  animation: fc-drop .85s var(--fc-ease) forwards;
+}
+@keyframes fc-drop { from { transform: scale(.3); opacity: .45 } to { transform: scale(4.2); opacity: 0 } }
+
+/* the muse: one question beside the words, never inside them */
+.fc-muse {
+  position: absolute; max-width: 240px; z-index: 8;
+  display: flex; gap: 8px; align-items: baseline;
+  padding: 8px 12px; border-radius: 12px;
+  background: var(--fc-lift);
+  font: italic 400 15px/1.45 var(--fc-serif); color: var(--fc-soft);
+  opacity: 0; transform: translateX(-4px);
+  transition: opacity .6s var(--fc-ease), transform .6s var(--fc-ease);
+  pointer-events: none;
+}
+.fc-muse.below { transform: translateY(-4px); }
+.fc-muse.on { opacity: 1; transform: none; }
+.fc-muse.quiet { font-size: 13px; color: var(--fc-faint); }
+.fc-muse-mark { font: 400 13px var(--fc-mono); color: var(--fc-accent); opacity: .8; }
+
+.fc-kept {
+  position: fixed; right: 18px; bottom: 16px; z-index: 20;
+  font: 400 11px var(--fc-mono); letter-spacing: .08em; color: var(--fc-faint);
+  opacity: 0; transition: opacity .8s ease; pointer-events: none;
+}
+.fc-kept.on { opacity: .9; transition: opacity .2s ease; }
+
+@media (max-width: 640px) {
+  .fc-txt { font-size: 19px; }
+  .fc-frag { max-width: calc(100% - 24px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fc *, .fc-hint-big { animation: none !important; transition: none !important; }
+}
