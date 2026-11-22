@@ -11,7 +11,7 @@ dialect: brain-app/v1
 id: hbar-ink
 name: hbar.ink
 version: 0.13.0
-description: Single-user writing instrument. Write anywhere on the page (tap, drag, edit in place, undo), shape the words from one small window (bold, italic, highlight, headings, lists, quote, indent, font-shape slider), then drop a fragment into the brain with its formatting as markdown. Absorbs compressed thoughts fast. Physicist symbol layer (Greek, operators, bra-ket). The muse in the margin asks one question on cue (Cmd+J), never writes into your drop.
+description: Single-user writing instrument. Write anywhere on the page, shape the words from one small window (bold, highlight, headings, lists, font shape), drop a fragment into the brain. Physicist symbols. The muse asks one question on cue.
 license: AGPL-3.0
 
 author:
