@@ -530,3 +530,8 @@
 }
 .ink-page .ink-chip:hover { border-color: var(--ink-accent); color: var(--ink-accent); }
 @media (prefers-reduced-motion: reduce) { .ink-page .ink-light { animation: none; } }
+
+/* v0.13 editing in place (INK-EDIT-1, 2026-11-22): highlight per theme */
+.ink-page[data-ink-theme="night"]    { --ink-mark: rgba(201,169,110,0.30); }
+.ink-page[data-ink-theme="academia"] { --ink-mark: rgba(214,160,80,0.38); }
+.ink-page[data-ink-theme="blog"]     { --ink-mark: rgba(212,175,55,0.30); }

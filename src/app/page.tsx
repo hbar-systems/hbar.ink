@@ -13,8 +13,22 @@ import '../../brain-app-dist/free-canvas.css'
 // module (brain-app-dist/free-canvas.js) used here and in the brain-app.
 // Words live in this browser only (localStorage); nothing is sent anywhere.
 // The previous look is archived at /v0.11.
+//
+// v0.13 (INK-EDIT-1, 2026-11-22): the words can be shaped in place. Select words,
+// press the Aa beside the fragment, or Cmd/Ctrl+E, and the quill opens: bold,
+// italic, highlight, cross out, plain again, title/heading, lists and checks,
+// quote, indent, and the font shape as a slider pushed up or down. Tab indents.
+// The v0.12 look is archived at /v0.12. /?try=edit opens a sample in a separate
+// page (its own storage) with the quill already open.
 
 const PAGE_KEY = 'hbar.ink.page.v1'
+const TRY_KEY = 'hbar.ink.page.try' // ?try=edit: a sample page, never your own
+const TRY_HTML =
+  '<h2>shape the words</h2>' +
+  '<div>select any of them and the quill opens. <b>bold</b>, <i>italic</i>, <mark>a highlight</mark>, <s>a thought crossed out</s>.</div>' +
+  '<div data-indent="1">tab moves a line in,</div><div data-indent="2">and in again.</div>' +
+  '<ul class="check"><li data-done="1">write it down</li><li>shape it</li></ul>' +
+  '<blockquote>push the slider up and the letters change shape.</blockquote>'
 const OLD_DROPS_KEY = 'hbar.ink.demo.drops.v1' // read for migration, never deleted
 
 const SEED_TEXT =
@@ -97,22 +111,33 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false
     let inst: any = null
+    const trying = new URLSearchParams(window.location.search).get('try') === 'edit'
+    if (trying) { try { localStorage.removeItem(TRY_KEY) } catch {} }
     import('../../brain-app-dist/free-canvas.js').then((mod: any) => {
       if (cancelled || !hostRef.current) return
       const FC = (mod && (mod.create ? mod : mod.default)) || (globalThis as any).FreeCanvas
       const w = window.innerWidth
       const narrow = w < 640
       inst = FC.create(hostRef.current, {
-        storageKey: PAGE_KEY,
+        storageKey: trying ? TRY_KEY : PAGE_KEY,
+        edit: true,
         minHeight: Math.max(520, window.innerHeight - 90),
         hint: 'Write anywhere.',
         hintSmall: 'Tap the page and begin. Your words stay in this browser.',
-        migrate: () => {
+        migrate: trying ? undefined : () => {
           const raw = localStorage.getItem(OLD_DROPS_KEY)
           const old = raw ? JSON.parse(raw) : []
           return Array.isArray(old) ? FC.fromDrops(old, w) : []
         },
-        seed: [{
+        seed: trying ? [{
+          id: 'try-edit',
+          text: '',
+          html: TRY_HTML,
+          x: narrow ? 0.03 : 0.3,
+          y: narrow ? 40 : 70,
+          ts: new Date().toISOString(),
+          from: 'him',
+        }] : [{
           id: 'seed-2026-05-09-hbar-manifesto',
           text: SEED_TEXT,
           x: narrow ? 0.05 : 0.64,
@@ -126,6 +151,7 @@ export default function Home() {
         onChange: () => setTouched(true),
       })
       canvasRef.current = inst
+      if (trying) setTimeout(() => inst.openQuill('try-edit', 'shape the '.length, 'shape the words'.length), 500)
     })
     return () => { cancelled = true; if (inst) inst.destroy(); canvasRef.current = null }
   }, [])
@@ -141,7 +167,7 @@ export default function Home() {
     if (!inst) return
     const frags = inst.fragments().filter((f: any) => !f.locked && f.text.trim())
       .sort((a: any, b: any) => a.y - b.y || a.x - b.x)
-    const md = '# hbar.ink page\n\n' + frags.map((f: any) => f.text).join('\n\n---\n\n') + '\n'
+    const md = '# hbar.ink page\n\n' + frags.map((f: any) => inst.markdown(f.id)).join('\n\n---\n\n') + '\n'
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
     a.download = 'hbar-ink-page-' + new Date().toISOString().slice(0, 10) + '.md'
@@ -192,7 +218,7 @@ export default function Home() {
       <main className="flex-1" style={{ position: 'relative', zIndex: 1 }}>
         <div ref={hostRef} className="mx-auto" style={{ maxWidth: 1240, padding: '0 12px' }} />
         <div className="mx-auto px-6 pb-6 ink-legend" style={{ maxWidth: 1240, opacity: touched ? 0.55 : 1 }}>
-          tap to write · drag to move · ⌘Z undo · ⌘. face · ⌘J muse
+          tap to write · drag to move · select to shape · tab indents · ⌘E the quill · ⌘Z undo · ⌘J muse
         </div>
       </main>
 
@@ -317,7 +343,7 @@ export default function Home() {
       <footer className="px-6 py-6" style={{ borderTop: '1px solid var(--ink-border)', position: 'relative', zIndex: 1 }}>
         <div className="max-w-3xl mx-auto flex justify-between items-center text-[11px] text-gray-400">
           <span>part of <a href="https://hbar.systems" target="_blank" rel="noopener noreferrer" className="hover:text-gray-700 transition-colors">hbar.systems</a></span>
-          <span style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>hbar.ink v0.12 · <a href="/v0.11" className="hover:text-gray-700 transition-colors">v0.11</a></span>
+          <span style={{ fontFamily: 'ui-monospace, "DM Mono", monospace' }}>hbar.ink v0.13 · <a href="/v0.12" className="hover:text-gray-700 transition-colors">v0.12</a> · <a href="/v0.11" className="hover:text-gray-700 transition-colors">v0.11</a></span>
         </div>
       </footer>
     </div>
